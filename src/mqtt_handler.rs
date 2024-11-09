@@ -8,11 +8,11 @@ use rumqttc::v5::{
     mqttbytes::{v5::Packet, QoS},
     AsyncClient, Event, EventLoop, MqttOptions,
 };
-use tokio::sync::{mpsc::Receiver, watch::Sender, RwLock};
+use tokio::sync::{mpsc::Receiver, watch::Sender};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
-use crate::{serverdata, PublishableMessage, HV_EN_TOPIC};
+use crate::{serverdata, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC};
 
 /// The chief processor of incoming mqtt data, this handles
 /// - mqtt state
@@ -21,16 +21,14 @@ use crate::{serverdata, PublishableMessage, HV_EN_TOPIC};
 pub struct MqttProcessor {
     cancel_token: CancellationToken,
     mqtt_sender_rx: Receiver<PublishableMessage>,
-    mqtt_recv: Option<(String, Arc<RwLock<f32>>)>,
     hv_stat_send: Sender<bool>,
+    mute_stat_send: Sender<bool>,
 }
 
 /// processor options, these are static immutable settings
 pub struct MqttProcessorOptions {
     /// URI of the mqtt server
     pub mqtt_path: String,
-    /// MQTT topic and place to put data, or none
-    pub mqtt_recv: Option<(String, Arc<RwLock<f32>>)>,
 }
 
 impl MqttProcessor {
@@ -39,6 +37,7 @@ impl MqttProcessor {
         cancel_token: CancellationToken,
         mqtt_sender_rx: Receiver<PublishableMessage>,
         hv_stat_send: Sender<bool>,
+        mute_stat_send: Sender<bool>,
         opts: MqttProcessorOptions,
     ) -> (MqttProcessor, MqttOptions) {
         // create the mqtt client and configure it
@@ -69,8 +68,8 @@ impl MqttProcessor {
             MqttProcessor {
                 cancel_token,
                 mqtt_sender_rx,
-                mqtt_recv: opts.mqtt_recv,
                 hv_stat_send,
+                mute_stat_send,
             },
             mqtt_opts,
         )
@@ -81,15 +80,6 @@ impl MqttProcessor {
     /// * `client` - The async mqttt v5 client to use for subscriptions
     pub async fn process_mqtt(mut self, client: Arc<AsyncClient>, mut eventloop: EventLoop) {
         debug!("Subscribing to siren with inputted topic");
-        if self.mqtt_recv.as_ref().is_some() {
-            client
-                .subscribe(
-                    self.mqtt_recv.as_ref().unwrap().0.clone(),
-                    rumqttc::v5::mqttbytes::QoS::ExactlyOnce,
-                )
-                .await
-                .expect("Could not subscribe to Siren");
-        }
         client
             .subscribe(HV_EN_TOPIC, rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
             .await
@@ -111,20 +101,24 @@ impl MqttProcessor {
                             warn!("Could not parse topic, topic: {:?}", msg.topic);
                             continue;
                         };
-                        if let Some(ref mqtt_recv) = self.mqtt_recv {
-                                let mut d = mqtt_recv.1.write().await;
-                                *d = *res.values.first().unwrap_or(&0f32);
-                        }
-
+                        let val = *res.values.first().unwrap_or(&-1f32) as u8;
                         match topic {
                             HV_EN_TOPIC => {
-                                let val = *res.values.first().unwrap_or(&-1f32) as u8;
                                 if val == 1 {
                                     self.hv_stat_send.send(true).expect("HV Stat Channel Closed");
                                 } else if val == 0 {
                                     self.hv_stat_send.send(false).expect("HV Stat Channel Closed");
                                 } else {
                                     warn!("Received bad HV message!");
+                                }
+                            },
+                            MUTE_EN_TOPIC => {
+                                if val == 1 {
+                                    self.mute_stat_send.send(true).expect("Mute Stat Channel Closed");
+                                } else if val == 0 {
+                                    self.mute_stat_send.send(false).expect("Mute Stat Channel Closed");
+                                } else {
+                                    warn!("Received bad mute message!");
                                 }
                             },
                             _ => {

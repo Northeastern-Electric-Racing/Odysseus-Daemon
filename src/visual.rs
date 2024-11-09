@@ -1,4 +1,8 @@
-use std::{error::Error, process::Stdio};
+use std::{
+    error::Error,
+    process::Stdio,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
@@ -16,6 +20,17 @@ pub async fn run_save_pipeline(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // ffmpeg -f video4linux2 -input_format mjpeg -s 1280x720 -i /dev/video0 -vf "drawtext=fontfile=FreeSerif.tff: \
     //text='%{localtime\:%T}': fontcolor=white@0.8: x=7: y=700" -vcodec libx264 -preset veryfast -f mp4 -pix_fmt yuv420p -y output.mp4
+
+    // use the passed in folder
+    let save_location = format!(
+        "{}/frontcam-{}-ner24.avi",
+        vid_opts.save_location,
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
     info!("Creating and launching ffmpeg...");
     let mut res = Command::new("ffmpeg").args([
         "-f",
@@ -37,20 +52,18 @@ pub async fn run_save_pipeline(
         "-pix_fmt",
         "yuv420p",
         "-y",
-        &vid_opts.save_location
+        &save_location
     ]).stdin(Stdio::null()).spawn()?;
 
-    loop {
-        tokio::select! {
-            _ = cancel_token.cancelled() => {
-                info!("Ffmpeg canceled");
-                res.wait().await.unwrap();
-                 return Ok(())
-            },
-            _ = res.wait() => {
-                warn!("Ffmpeg ended early!");
-                return Ok(())
-            }
+    tokio::select! {
+        _ = cancel_token.cancelled() => {
+            info!("Ffmpeg canceled");
+            res.wait().await.unwrap();
+              Ok(())
+        },
+        _ = res.wait() => {
+            warn!("Ffmpeg ended early!");
+             Ok(())
         }
     }
 }

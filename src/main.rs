@@ -5,6 +5,7 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
+    audible::audible_manager,
     lockdown::lockdown_runner,
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
     numerical::collect_data,
@@ -24,15 +25,19 @@ use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 #[derive(Parser, Debug)]
 #[command(version)]
 struct VisualArgs {
-    /// Enable lockdown mode
+    /// Enable lockdown module
     #[arg(short = 's', long, env = "TPU_TELEMETRY_LOCKDOWN_ENABLE")]
     lockdown: bool,
 
-    /// Enable data mode
+    /// Enable audio module
+    #[arg(short = 'a', long, env = "TPU_TELEMETRY_AUDIBLE_ENABLE")]
+    audible: bool,
+
+    /// Enable data module
     #[arg(short = 'd', long, env = "TPU_TELEMETRY_DATA_ENABLE")]
     data: bool,
 
-    /// Enable video mode
+    /// Enable video module
     #[arg(short = 'v', long, env = "TPU_TELEMETRY_VIDEO_ENABLE")]
     video: bool,
 
@@ -85,6 +90,7 @@ async fn main() {
     let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
 
     let (hv_stat_send, hv_stat_recv) = watch::channel(false);
+    let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
@@ -98,23 +104,13 @@ async fn main() {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    // use the passed in folder
-    let save_location = format!(
-        "{}/frontcam-{}-ner24.avi",
-        cli.output_folder,
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
-
     let video_token = token.clone();
     if cli.video {
         task_tracker.spawn(run_save_pipeline(
             video_token,
             SavePipelineOpts {
                 video: cli.video_uri.clone(),
-                save_location,
+                save_location: cli.output_folder,
             },
         ));
     }
@@ -124,9 +120,9 @@ async fn main() {
         token.clone(),
         mqtt_sender_rx,
         hv_stat_send,
+        mute_stat_send,
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
-            mqtt_recv: None,
         },
     );
     let (client, eventloop) = AsyncClient::new(opts, 600);
@@ -140,7 +136,12 @@ async fn main() {
 
     if cli.lockdown {
         info!("Running lockdown module");
-        task_tracker.spawn(lockdown_runner(hv_stat_recv));
+        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv));
+    }
+
+    if cli.audible {
+        info!("Running audio module");
+        task_tracker.spawn(audible_manager(token.clone(), mute_stat_recv));
     }
 
     task_tracker.close();
