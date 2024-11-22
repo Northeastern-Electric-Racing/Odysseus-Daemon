@@ -25,6 +25,7 @@ target/
 
 # protobuf
 serverdata.rs
+playback_data.rs
 
-# test videos
-*.avi
+# test
+/data

@@ -15,6 +15,7 @@ Modules
 - `lockdown`: Feature disabler and modifier upon HV enablement.  Status: Alpha
 - `audible`: Call feature trigger and monitor.  Status: Alpha
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
+- `logger`: MQTT receiver and disk logger. Status: Beta
 
 
 **This program will only run on Odysseus**

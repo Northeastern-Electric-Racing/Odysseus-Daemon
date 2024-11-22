@@ -1,28 +1,40 @@
 use std::{
     sync::Arc,
-    time::{Duration, SystemTime},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use protobuf::Message;
+use protobuf::{Message, SpecialFields};
 use rumqttc::v5::{
     mqttbytes::{v5::Packet, QoS},
     AsyncClient, Event, EventLoop, MqttOptions,
 };
-use tokio::sync::{mpsc::Receiver, watch::Sender};
+use tokio::sync::{
+    mpsc::{self, Receiver},
+    watch::Sender,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
-use crate::{serverdata, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC};
+use crate::{
+    playback_data, serverdata, HVTransition, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC,
+};
 
 /// The chief processor of incoming mqtt data, this handles
 /// - mqtt state
 /// - reception via mqtt and subsequent parsing
-///
+///     Takes in many channels:
+/// - mqtt_sender_rx: A receiver of any messages, it then publishes them
+/// - hv_stat_send: A sender of the current HV state (only if it changes!), will be set to ON if augment_hv_on is true
+/// - mute_stat_send: A sender of the current mute button state
+/// - mqtt_recv_tx: Optional, a sender of all mqtt messages, if None no messages sent
 pub struct MqttProcessor {
     cancel_token: CancellationToken,
     mqtt_sender_rx: Receiver<PublishableMessage>,
-    hv_stat_send: Sender<bool>,
+    hv_stat_send: Sender<HVTransition>,
+    augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
+    data_folder: String,
+    mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
 }
 
 /// processor options, these are static immutable settings
@@ -36,8 +48,11 @@ impl MqttProcessor {
     pub fn new(
         cancel_token: CancellationToken,
         mqtt_sender_rx: Receiver<PublishableMessage>,
-        hv_stat_send: Sender<bool>,
+        hv_stat_send: Sender<HVTransition>,
+        augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
+        mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+        data_folder: String,
         opts: MqttProcessorOptions,
     ) -> (MqttProcessor, MqttOptions) {
         // create the mqtt client and configure it
@@ -69,7 +84,10 @@ impl MqttProcessor {
                 cancel_token,
                 mqtt_sender_rx,
                 hv_stat_send,
+                augment_hv_on,
                 mute_stat_send,
+                mqtt_recv_tx,
+                data_folder,
             },
             mqtt_opts,
         )
@@ -79,11 +97,34 @@ impl MqttProcessor {
     /// * `eventloop` - The eventloop returned by ::new to connect to.  The loop isnt sync so this is the best that can be done
     /// * `client` - The async mqttt v5 client to use for subscriptions
     pub async fn process_mqtt(mut self, client: Arc<AsyncClient>, mut eventloop: EventLoop) {
-        debug!("Subscribing to siren with inputted topic");
+        debug!("Subscribing to siren, all topics");
         client
-            .subscribe(HV_EN_TOPIC, rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
+            .subscribe("#", rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
             .await
             .expect("Could not subscribe to Siren");
+
+        // if augment HV on, send as such, otherwise start default off
+        let mut last_stat = if self.augment_hv_on {
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            warn!("HV status permanently set on!!");
+            if let Err(err) = std::fs::create_dir(format!("{}/event-{}", self.data_folder, time)) {
+                panic!(
+                    "Could not create folder for data, bailing out of this loop! {}",
+                    err
+                );
+            }
+            self.hv_stat_send
+                .send(HVTransition::TransitionOn(crate::HVOnData {
+                    time_ms: time,
+                }))
+                .expect("HV Stat Channel Closed");
+            true
+        } else {
+            false
+        };
 
         loop {
             tokio::select! {
@@ -104,15 +145,28 @@ impl MqttProcessor {
                         let val = *res.values.first().unwrap_or(&-1f32) as u8;
                         match topic {
                             HV_EN_TOPIC => {
-                                if val == 1 {
-                                    self.hv_stat_send.send(true).expect("HV Stat Channel Closed");
-                                } else if val == 0 {
-                                    self.hv_stat_send.send(false).expect("HV Stat Channel Closed");
-                                } else {
-                                    warn!("Received bad HV message!");
+                                if !self.augment_hv_on {
+                                    // ensure only triggering upon change from previous loop
+                                 if val == 1 && !last_stat {
+                                        debug!("Transitioning states to HV on, creating folder!");
+                                        if let Err(err) = std::fs::create_dir(format!("{}/event-{}",self.data_folder, res.time_us / 1000)) {
+                                            warn!("Could not create folder for data, bailing out of this loop! {}", err);
+                                            continue;
+                                        }
+                                       self.hv_stat_send.send(HVTransition::TransitionOn(
+                                           crate::HVOnData { time_ms:  res.time_us / 1000})).expect("HV Stat Channel Closed");
+                                        last_stat = true;
+                                    } else if val == 0 && last_stat {
+                                        debug!("Transitioning states to HV off");
+                                       self.hv_stat_send.send(HVTransition::TransitionOff).expect("HV Stat Channel Closed");
+                                       last_stat = false;
+                                    } else if val != 0 && val != 1 {
+                                        warn!("Received bad HV message!");
+                                    }
                                 }
                             },
                             MUTE_EN_TOPIC => {
+                                // mute button messages should be single shot
                                 if val == 1 {
                                     self.mute_stat_send.send(true).expect("Mute Stat Channel Closed");
                                 } else if val == 0 {
@@ -122,7 +176,13 @@ impl MqttProcessor {
                                 }
                             },
                             _ => {
-                                warn!("Unknown topic received: {}", topic);
+                            }
+                        }
+                        // if using it, send all mqtt messages to data logger
+                        if let Some(ref recv) = self.mqtt_recv_tx {
+                            if let Err(err) = recv.send(playback_data::PlaybackData{
+                                topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }).await {
+                                warn!("Error sending message received! {}", err);
                             }
                         }
                     }

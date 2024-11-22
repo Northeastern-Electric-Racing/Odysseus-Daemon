@@ -7,10 +7,12 @@ use clap::Parser;
 use odysseus_daemon::{
     audible::audible_manager,
     lockdown::lockdown_runner,
+    logger::logger_manager,
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
     numerical::collect_data,
+    playback_data,
     visual::{run_save_pipeline, SavePipelineOpts},
-    PublishableMessage,
+    HVTransition, PublishableMessage,
 };
 use rumqttc::v5::AsyncClient;
 use tokio::{
@@ -25,49 +27,61 @@ use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 #[derive(Parser, Debug)]
 #[command(version)]
 struct VisualArgs {
+    /// Augment HV on
+    #[arg(long, env = "ODYSSEUS_DAEMON_AUGMENT_HV")]
+    mock: bool,
+
     /// Enable lockdown module
-    #[arg(short = 's', long, env = "TPU_TELEMETRY_LOCKDOWN_ENABLE")]
+    #[arg(short = 's', long, env = "ODYSSEUS_DAEMON_LOCKDOWN_ENABLE")]
     lockdown: bool,
 
     /// Enable audio module
-    #[arg(short = 'a', long, env = "TPU_TELEMETRY_AUDIBLE_ENABLE")]
+    #[arg(short = 'a', long, env = "ODYSSEUS_DAEMON_AUDIBLE_ENABLE")]
     audible: bool,
 
     /// Enable data module
-    #[arg(short = 'd', long, env = "TPU_TELEMETRY_DATA_ENABLE")]
+    #[arg(short = 'd', long, env = "ODYSSEUS_DAEMON_DATA_ENABLE")]
     data: bool,
 
+    /// Enable logger
+    #[arg(long, env = "ODYSSEUS_DAEMON_LOGGER_ENABLE")]
+    logger: bool,
+
     /// Enable video module
-    #[arg(short = 'v', long, env = "TPU_TELEMETRY_VIDEO_ENABLE")]
+    #[arg(short = 'v', long, env = "ODYSSEUS_DAEMON_VIDEO_ENABLE")]
     video: bool,
 
-    /// The video file
-    #[arg(short = 'l', long, env = "TPU_TELEMETRY_VIDEO_FILE")]
-    video_uri: String,
+    /// The input video file
+    #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
+    video_uri: Option<String>,
 
     /// The MQTT/Siren URL
     #[arg(
         short = 'u',
         long,
         default_value = "localhost:1883",
-        env = "TPU_TELEMETRY_SIREN_URL"
+        env = "ODYSSEUS_DAEMON_SIREN_URL"
     )]
     mqtt_url: String,
 
-    /// The MQTT topic to get the data from if overlay is wanted
-    #[arg(short = 't', long, env = "TPU_TELEMETRY_SIREN_TOPIC")]
-    mqtt_topic: Option<String>,
-
-    /// The output folder of videos, no trailing slash
-    #[arg(short = 'f', long, env = "TPU_TELEMETRY_OUTPUT_FOLDER")]
+    /// The output folder of data (videos, audio, text logs, etc), no trailing slash
+    #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
 }
 
+/// Folder hierarchy
+/// Main folder --> specified by the user --output_folder
+///                                               |
+///                                               |
+///                                         event-<TIME_MS>
+///                                               |
+///                                              / \
+/// (video): ner24-frontcam.avi; (logger): data_dump.log; (serial): serial_dump.log; (audio): ner24-comms.mp3
 #[tokio::main]
 async fn main() {
     let cli = VisualArgs::parse();
 
-    println!("Initializing tpu telemetry...");
+    println!("Initializing odysseus daemon...");
     println!("Initializing fmt subscriber");
     // construct a subscriber that prints formatted traces to stdout
     // if RUST_LOG is not set, defaults to loglevel INFO
@@ -89,8 +103,16 @@ async fn main() {
     // TODO tune buffer size
     let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
 
-    let (hv_stat_send, hv_stat_recv) = watch::channel(false);
+    let (hv_stat_send, hv_stat_recv) = watch::channel(HVTransition::TransitionOff);
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
+
+    // create wildcard mqtt channel only if logger is enabled
+    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger {
+        let (tx, rx) = mpsc::channel::<playback_data::PlaybackData>(1000);
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
 
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
@@ -104,23 +126,15 @@ async fn main() {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    let video_token = token.clone();
-    if cli.video {
-        task_tracker.spawn(run_save_pipeline(
-            video_token,
-            SavePipelineOpts {
-                video: cli.video_uri.clone(),
-                save_location: cli.output_folder,
-            },
-        ));
-    }
-
     info!("Running MQTT processor");
     let (recv, opts) = MqttProcessor::new(
         token.clone(),
         mqtt_sender_rx,
         hv_stat_send,
+        cli.mock,
         mute_stat_send,
+        mqtt_recv_tx,
+        cli.output_folder.clone(),
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
         },
@@ -129,6 +143,21 @@ async fn main() {
     let client_sharable: Arc<AsyncClient> = Arc::new(client);
     task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
 
+    // TASK SPAWNING
+
+    if cli.video {
+        info!("Running video module");
+        task_tracker.spawn(run_save_pipeline(
+            token.clone(),
+            hv_stat_recv.clone(),
+            SavePipelineOpts {
+                video: cli
+                    .video_uri
+                    .expect("Must provide video URI if video is enabled!"),
+                save_location: cli.output_folder,
+            },
+        ));
+    }
     if cli.data {
         info!("Running TPU data collector");
         task_tracker.spawn(collect_data(token.clone(), mqtt_sender_tx.clone()));
@@ -142,6 +171,10 @@ async fn main() {
     if cli.audible {
         info!("Running audio module");
         task_tracker.spawn(audible_manager(token.clone(), mute_stat_recv));
+    }
+    if cli.logger {
+        info!("Running logger module");
+        task_tracker.spawn(logger_manager(token.clone(), mqtt_recv_rx.unwrap()));
     }
 
     task_tracker.close();
