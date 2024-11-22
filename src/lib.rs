@@ -38,5 +38,5 @@ pub const HV_EN_TOPIC: &str = "MPU/State/TSMS";
 pub const MUTE_EN_TOPIC: &str = "WHEEL/Buttons/Mute";
 
 /// The save location for all files
-pub const SAVE_LOCATION: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
+pub static SAVE_LOCATION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 

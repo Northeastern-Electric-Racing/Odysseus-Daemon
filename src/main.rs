@@ -17,7 +17,7 @@ use odysseus_daemon::{
 use rumqttc::v5::AsyncClient;
 use tokio::{
     signal,
-    sync::{mpsc, watch, OnceCell},
+    sync::{mpsc, watch},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
@@ -100,9 +100,7 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("Could not init tracing");
 
     // set save location
-    SAVE_LOCATION
-        .get_or_init(|| async { cli.output_folder })
-        .await;
+    SAVE_LOCATION.get_or_init(|| cli.output_folder);
 
     // channel to pass the mqtt data
     // TODO tune buffer size
