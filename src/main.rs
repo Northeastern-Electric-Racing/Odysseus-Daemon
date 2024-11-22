@@ -12,12 +12,12 @@ use odysseus_daemon::{
     numerical::collect_data,
     playback_data,
     visual::{run_save_pipeline, SavePipelineOpts},
-    HVTransition, PublishableMessage,
+    HVTransition, PublishableMessage, SAVE_LOCATION,
 };
 use rumqttc::v5::AsyncClient;
 use tokio::{
     signal,
-    sync::{mpsc, watch},
+    sync::{mpsc, watch, OnceCell},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
@@ -99,6 +99,11 @@ async fn main() {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Could not init tracing");
 
+    // set save location
+    SAVE_LOCATION
+        .get_or_init(|| async { cli.output_folder })
+        .await;
+
     // channel to pass the mqtt data
     // TODO tune buffer size
     let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
@@ -134,7 +139,6 @@ async fn main() {
         cli.mock,
         mute_stat_send,
         mqtt_recv_tx,
-        cli.output_folder.clone(),
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
         },
@@ -154,7 +158,6 @@ async fn main() {
                 video: cli
                     .video_uri
                     .expect("Must provide video URI if video is enabled!"),
-                save_location: cli.output_folder,
             },
         ));
     }

@@ -17,6 +17,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     playback_data, serverdata, HVTransition, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC,
+    SAVE_LOCATION,
 };
 
 /// The chief processor of incoming mqtt data, this handles
@@ -33,7 +34,6 @@ pub struct MqttProcessor {
     hv_stat_send: Sender<HVTransition>,
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
-    data_folder: String,
     mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
 }
 
@@ -52,7 +52,6 @@ impl MqttProcessor {
         augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
         mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
-        data_folder: String,
         opts: MqttProcessorOptions,
     ) -> (MqttProcessor, MqttOptions) {
         // create the mqtt client and configure it
@@ -87,7 +86,6 @@ impl MqttProcessor {
                 augment_hv_on,
                 mute_stat_send,
                 mqtt_recv_tx,
-                data_folder,
             },
             mqtt_opts,
         )
@@ -110,7 +108,9 @@ impl MqttProcessor {
                 .unwrap()
                 .as_millis() as u64;
             warn!("HV status permanently set on!!");
-            if let Err(err) = std::fs::create_dir(format!("{}/event-{}", self.data_folder, time)) {
+            if let Err(err) =
+                std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), time))
+            {
                 panic!(
                     "Could not create folder for data, bailing out of this loop! {}",
                     err
@@ -149,7 +149,7 @@ impl MqttProcessor {
                                     // ensure only triggering upon change from previous loop
                                  if val == 1 && !last_stat {
                                         debug!("Transitioning states to HV on, creating folder!");
-                                        if let Err(err) = std::fs::create_dir(format!("{}/event-{}",self.data_folder, res.time_us / 1000)) {
+                                        if let Err(err) = std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), res.time_us / 1000)) {
                                             warn!("Could not create folder for data, bailing out of this loop! {}", err);
                                             continue;
                                         }

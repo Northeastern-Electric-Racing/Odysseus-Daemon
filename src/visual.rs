@@ -7,13 +7,11 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-use crate::HVTransition;
+use crate::{HVTransition, SAVE_LOCATION};
 
 pub struct SavePipelineOpts {
     /// the dev to read for video
     pub video: String,
-    /// the folder to save to
-    pub save_location: String,
 }
 
 /// Run a save pipeline on the items
@@ -50,7 +48,7 @@ pub async fn run_save_pipeline(
                 HVTransition::TransitionOn(hvon_data) => {
                     let save_location = format!(
                         "{}/event-{}/ner24-frontcam.avi",
-                        vid_opts.save_location,
+                        SAVE_LOCATION.get().unwrap(),
                         hvon_data.time_ms
                     );
                     info!("Creating and launching ffmpeg...");
