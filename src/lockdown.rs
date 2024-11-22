@@ -108,6 +108,7 @@ pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
     Ok((
         Command::new("minicom")
             .args([
+                "-D",
                 "/dev/ttyCerberus",
                 "-O",
                 "timestamp=extended",
@@ -117,6 +118,7 @@ pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
             .spawn()?,
         Command::new("minicom")
             .args([
+                "-D",
                 "/dev/ttyCerberus",
                 "-O",
                 "timestamp=extended",
