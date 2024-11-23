@@ -1,9 +1,9 @@
-use std::{error::Error, process::Stdio, sync::Arc, time::Duration};
+use std::{error::Error, process::Stdio, time::Duration};
 
 use tokio::{
     io,
     process::{Child, Command},
-    sync::{watch::Receiver, RwLock},
+    sync::watch::Receiver,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -16,24 +16,15 @@ pub async fn lockdown_runner(
     cancel_token: CancellationToken,
     mut hv_stat_recv: Receiver<HVTransition>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let cmds: Arc<RwLock<(Child, Child)>> = Arc::new(RwLock::new((
-        Command::new("sleep")
-            .args(["2147483647"])
-            .stdin(Stdio::null())
-            .spawn()?,
-        Command::new("sleep")
-            .args(["2147483647"])
-            .stdin(Stdio::null())
-            .spawn()?,
-    )));
-    if let Err(err) = hv_transition_disabled(&mut (*cmds.write().await)).await {
+    let mut cmds: Option<(Child, Child)> = None;
+    if let Err(err) = hv_transition_disabled(&mut cmds).await {
         warn!("Could not unlock!!! {}", err);
     }
 
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
-                if let Err(err) = hv_transition_disabled(&mut (*cmds.write().await)).await {
+                if let Err(err) = hv_transition_disabled(&mut cmds).await {
                     warn!("Could not unlock!!! {}", err);
                 }
                 break Ok(());
@@ -48,11 +39,11 @@ pub async fn lockdown_runner(
                             warn!("Could not lock down!!!");
                             continue;
                         };
-                        *cmds.write().await = children;
+                        cmds = Some(children);
                     },
                     HVTransition::TransitionOff => {
                         info!("Unlocking!");
-                    if let Err(err) = hv_transition_disabled(&mut (*cmds.write().await)).await {
+                    if let Err(err) = hv_transition_disabled(&mut cmds).await {
                         warn!("Could not unlock!!! {}", err);
                     }
                     },
@@ -115,6 +106,7 @@ pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
                 "-C",
                 &cerb_save_loc,
             ])
+            .stdout(Stdio::null())
             .spawn()?,
         Command::new("minicom")
             .args([
@@ -125,12 +117,13 @@ pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
                 "-C",
                 &shep_save_loc,
             ])
+            .stdout(Stdio::null())
             .spawn()?,
     ))
 }
 
 /// Transition to HV off
-pub async fn hv_transition_disabled(child_writers: &mut (Child, Child)) -> io::Result<()> {
+pub async fn hv_transition_disabled(child_writers: &mut Option<(Child, Child)>) -> io::Result<()> {
     let mut cmd_cerb_rec = Command::new("usbip")
         .args(["bind", "--busid", "1-1.3"])
         .spawn()?;
@@ -141,8 +134,10 @@ pub async fn hv_transition_disabled(child_writers: &mut (Child, Child)) -> io::R
     cmd_cerb_rec.wait().await?;
     cmd_shep_rec.wait().await?;
 
-    child_writers.0.kill().await?;
-    child_writers.1.kill().await?;
+    if let Some(child_writers) = child_writers {
+        child_writers.0.kill().await?;
+        child_writers.1.kill().await?;
+    }
 
     // if !cmd_cerb_rec.wait().await.unwrap().success() && !cmd_shep_rec.wait().await.unwrap().success()  {
     //     println!("Failed to run USBIP command(s) to unbind");

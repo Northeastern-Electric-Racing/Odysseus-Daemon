@@ -166,7 +166,7 @@ async fn main() {
 
     if cli.lockdown {
         info!("Running lockdown module");
-        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv));
+        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv.clone()));
     }
 
     if cli.audible {
@@ -175,7 +175,11 @@ async fn main() {
     }
     if cli.logger {
         info!("Running logger module");
-        task_tracker.spawn(logger_manager(token.clone(), mqtt_recv_rx.unwrap()));
+        task_tracker.spawn(logger_manager(
+            token.clone(),
+            mqtt_recv_rx.unwrap(),
+            hv_stat_recv.clone(),
+        ));
     }
 
     task_tracker.close();

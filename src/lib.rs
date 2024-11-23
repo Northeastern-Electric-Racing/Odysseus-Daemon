@@ -39,4 +39,3 @@ pub const MUTE_EN_TOPIC: &str = "WHEEL/Buttons/Mute";
 
 /// The save location for all files
 pub static SAVE_LOCATION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-

@@ -12,10 +12,10 @@ Core principles:
 
 Modules
 - `visual`: Camera process manager and writer.  Status: Beta
-- `lockdown`: Feature disabler and modifier upon HV enablement.  Status: Alpha
-- `audible`: Call feature trigger and monitor.  Status: Alpha
+- `lockdown`: Feature disabler and modifier upon HV enablement.  Status: Beta
+- `audible`: Call feature trigger and monitor.  Status: Beta
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
-- `logger`: MQTT receiver and disk logger. Status: Beta
+- `logger`: MQTT receiver and disk logger. Status: Alpha
 
 
 **This program will only run on Odysseus**

@@ -1,7 +1,7 @@
 use std::{fs, time::Duration};
 
 use sysinfo::{Components, MemoryRefreshKind, Pid, ProcessesToUpdate, System};
-use tokio::sync::{mpsc::Sender, Mutex};
+use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
@@ -13,9 +13,8 @@ pub async fn collect_data(
     mqtt_sender_tx: Sender<PublishableMessage>,
 ) {
     // create requisites
-    let sys = Mutex::new(System::new_all());
-    let mut sys_l = sys.lock().await;
-    sys_l.refresh_all();
+    let mut sys = System::new_all();
+    sys.refresh_all();
 
     // for CPU temp
     let mut components = Components::new_with_refreshed_list();
@@ -38,7 +37,6 @@ pub async fn collect_data(
         warn!("Could not parse mosquitto pid, using 1, error: {}", a);
         1
     });
-    drop(sys_l);
 
     // STEP 1: add a refresh rates for the message
 
@@ -79,30 +77,28 @@ pub async fn collect_data(
                 const TOPIC_B: &str = "TPU/OnBoard/BrokerCpuUsage";
                 const UNIT_B: &str = "%";
 
-                let mut sys_l = sys.lock().await;
 
-                sys_l.refresh_cpu_usage();
-                sys_l.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid_clean)]),
+                sys.refresh_cpu_usage();
+                sys.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid_clean)]),
                         true);
 
-                let process = sys_l.process(Pid::from_u32(pid_clean)).unwrap_or_else(|| {
+                let process = sys.process(Pid::from_u32(pid_clean)).unwrap_or_else(|| {
                     warn!("Could not find mosquitto from PID, using 1");
-                    sys_l.process(Pid::from(1)).unwrap()
+                    sys.process(Pid::from(1)).unwrap()
                 });
                 trace!("Using process: {:?}", process.name());
 
                 vec![
-                    PublishableMessage{ topic: TOPIC_C, data: vec![sys_l.global_cpu_usage()], unit: UNIT_C },
+                    PublishableMessage{ topic: TOPIC_C, data: vec![sys.global_cpu_usage()], unit: UNIT_C },
                 PublishableMessage{ topic: TOPIC_B, data: vec![process.cpu_usage()], unit: UNIT_B }]
             },
             _ = mem_avail_int.tick() => {
                 const TOPIC: &str = "TPU/OnBoard/MemAvailable";
                 const UNIT: &str = "MB";
 
-                let mut sys_l = sys.lock().await;
-                sys_l.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
+                sys.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
 
-                vec![PublishableMessage { topic: TOPIC, data: vec![sys_l.free_memory() as f32 / 1e6], unit: UNIT}]
+                vec![PublishableMessage { topic: TOPIC, data: vec![sys.free_memory() as f32 / 1e6], unit: UNIT}]
             }
         };
         for msg in msgs {
