@@ -17,5 +17,11 @@ Modules
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
 - `logger`: MQTT receiver and disk logger. Status: Alpha
 
+Upload modules:
+- `logger`: Upload from the logger module to scylla. Status: Beta
+- `visual`: Camera video uploader to cloud platform. Status: Incomplete
+- `serial`: (from `lockdown` module) Serial output uploader to cloud platform. Status Incomplete
+- 
+
 
 **This program will only run on Odysseus**
