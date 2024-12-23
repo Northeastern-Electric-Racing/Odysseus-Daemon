@@ -67,7 +67,7 @@ pub async fn collect_data(
                     }
                 };
 
-                vec![PublishableMessage{ topic: TOPIC, data: vec![value], unit: UNIT }]
+                vec![PublishableMessage{ topic: TOPIC, data: vec![value.unwrap()], unit: UNIT }]
 
             }
             _ = cpu_usage_int.tick() => {
@@ -96,7 +96,7 @@ pub async fn collect_data(
                 const TOPIC: &str = "TPU/OnBoard/MemAvailable";
                 const UNIT: &str = "MB";
 
-                sys.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
+                sys.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 
                 vec![PublishableMessage { topic: TOPIC, data: vec![sys.free_memory() as f32 / 1e6], unit: UNIT}]
             }

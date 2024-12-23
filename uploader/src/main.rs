@@ -20,9 +20,9 @@ struct UploaderArgs {
 }
 
 /// Logger module: upload a data_dump.log file to scylla
-fn logger_upload<'a>(
+fn logger_upload(
     filepath: &Path,
-    scylla_uri: &'a str,
+    scylla_uri: &str,
     client: &reqwest::blocking::Client,
 ) -> Result<(), reqwest::Error> {
     let res = client
@@ -36,7 +36,7 @@ fn logger_upload<'a>(
 
     res.error_for_status()?;
 
-    return Ok(());
+    Ok(())
 }
 
 fn main() {
@@ -90,5 +90,8 @@ fn main() {
         }
     }
 
-    println!("Done, feel free to clear the inside of the {} directory!", cli.output_folder);
+    println!(
+        "Done, feel free to clear the inside of the {} directory!",
+        cli.output_folder
+    );
 }
