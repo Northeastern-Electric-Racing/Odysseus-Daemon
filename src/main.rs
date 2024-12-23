@@ -12,7 +12,7 @@ use odysseus_daemon::{
     numerical::collect_data,
     playback_data,
     visual::{run_save_pipeline, SavePipelineOpts},
-    HVTransition, PublishableMessage,
+    HVTransition, PublishableMessage, SAVE_LOCATION,
 };
 use rumqttc::v5::AsyncClient;
 use tokio::{
@@ -99,6 +99,9 @@ async fn main() {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Could not init tracing");
 
+    // set save location
+    SAVE_LOCATION.get_or_init(|| cli.output_folder);
+
     // channel to pass the mqtt data
     // TODO tune buffer size
     let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
@@ -134,7 +137,6 @@ async fn main() {
         cli.mock,
         mute_stat_send,
         mqtt_recv_tx,
-        cli.output_folder.clone(),
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
         },
@@ -154,7 +156,6 @@ async fn main() {
                 video: cli
                     .video_uri
                     .expect("Must provide video URI if video is enabled!"),
-                save_location: cli.output_folder,
             },
         ));
     }
@@ -165,7 +166,7 @@ async fn main() {
 
     if cli.lockdown {
         info!("Running lockdown module");
-        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv));
+        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv.clone()));
     }
 
     if cli.audible {
@@ -174,7 +175,11 @@ async fn main() {
     }
     if cli.logger {
         info!("Running logger module");
-        task_tracker.spawn(logger_manager(token.clone(), mqtt_recv_rx.unwrap()));
+        task_tracker.spawn(logger_manager(
+            token.clone(),
+            mqtt_recv_rx.unwrap(),
+            hv_stat_recv.clone(),
+        ));
     }
 
     task_tracker.close();

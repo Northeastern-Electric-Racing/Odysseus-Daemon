@@ -3,8 +3,16 @@ name = "odysseus-daemon"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[workspace]
+members = ["uploader"]
+
+[workspace.dependencies]
+reqwest = { version = "0.12.9", features = ["blocking", "multipart"] }
 clap = { version = "4.5.23", features = ["derive", "env"] }
+
+
+[dependencies]
+clap.workspace = true
 protobuf = "3.7.1"
 rumqttc = "0.24.0"
 serde = { version = "1.0.216", features = ["derive"] }
