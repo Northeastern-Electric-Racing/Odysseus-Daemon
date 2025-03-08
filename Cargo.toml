@@ -7,18 +7,18 @@ edition = "2021"
 members = ["uploader"]
 
 [workspace.dependencies]
-reqwest = { version = "0.12.9", features = ["blocking", "multipart"] }
-clap = { version = "4.5.23", features = ["derive", "env"] }
+reqwest = { version = "0.12.12", features = ["blocking", "multipart"] }
+clap = { version = "4.5.30", features = ["derive", "env"] }
 
 
 [dependencies]
 clap.workspace = true
 protobuf = "3.7.1"
 rumqttc = "0.24.0"
-serde = { version = "1.0.216", features = ["derive"] }
+serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.134"
-sysinfo = "0.33.0"
-tokio = { version = "1.42.0", features = ["full", "tracing"] }
+sysinfo = "0.33.1"
+tokio = { version = "1.43.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.7.13", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["ansi", "env-filter"] }
