@@ -49,7 +49,7 @@ pub async fn run_save_pipeline(
                     let cmd_new = Command::new("ffmpeg").args([
                         "-f",
                      "v4l2",
-                     "-framerate",
+                     "-framerate", "25",
                      "-video_size",
                      "640x480",
                        "-i",
