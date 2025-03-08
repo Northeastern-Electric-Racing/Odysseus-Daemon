@@ -41,31 +41,22 @@ pub async fn run_save_pipeline(
             match curr_data {
                 HVTransition::TransitionOn(hvon_data) => {
                     let save_location = format!(
-                        "{}/event-{}/ner24-frontcam.avi",
+                        "{}/event-{}/ner24-frontcam.mp4",
                         SAVE_LOCATION.get().unwrap(),
                         hvon_data.time_ms
                     );
                     info!("Creating and launching ffmpeg...");
                     let cmd_new = Command::new("ffmpeg").args([
                         "-f",
-                     "video4linux2",
-                        "-input_format",
-                    "mjpeg",
-                     "-s",
-                 "1280x720",
+                     "v4l2",
+                     "-framerate",
+                     "-video_size",
+                     "640x480",
                        "-i",
                    &vid_opts.video,
-                   "-vf",
-                   r"drawtext=fontfile=FreeSerif.tff: \text='%{localtime\:%F %r}': fontcolor=white@0.8: x=7: y=700",
-                  "-vcodec",
-                   "libx264",
-                   "-preset",
-                 "veryfast",
-                   "-f",
-                   "avi",
-                  "-pix_fmt",
-                  "yuv420p",
-                    "-y",
+                   "-c:v", "libx264", "-b:v", "1600k", "-preset", "ultrafast", "-vf",
+                   r#"drawtext="text='%{localtime\:%F %r}':fontcolor='#EE4245': x=0: y=0:fontsize=24'"#,
+                   "-x264opts", "keyint=50", "-g", "25", "-pix_fmt", "yuv420p", "-y",
                    &save_location
                     ]).stdin(Stdio::null()).spawn()?;
                     cmd = Some(cmd_new);
