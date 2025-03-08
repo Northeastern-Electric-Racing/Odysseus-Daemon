@@ -57,7 +57,7 @@ pub async fn run_save_pipeline(
                    "-c:v", "libx264", "-b:v", "1600k", "-preset", "ultrafast", "-vf",
                    r#"drawtext=text='%{localtime\:%F %r}':fontcolor='#EE4245': x=0: y=0:fontsize=24'"#,
                    "-x264opts", "keyint=50", "-g", "25", "-pix_fmt", "yuv420p", 
-                   "-f", "mpegts", r"udp://239.0.0.2:8000",
+                   "-f", "mpegts", r"udp://192.168.100.11:7998?pkt_size=1316",
                    "-y",
                    &save_location
                     ]).stdin(Stdio::null()).spawn()?;
