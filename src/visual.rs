@@ -47,7 +47,7 @@ pub async fn run_save_pipeline(
                     );
                     info!("Creating and launching ffmpeg...");
                     let cmd_new = Command::new("ffmpeg").args([
-                        "-nostdin",
+                        "-nostdin", "-y",
                         "-f",
                      "v4l2",
                      "-framerate", "25",
@@ -57,10 +57,9 @@ pub async fn run_save_pipeline(
                    &vid_opts.video,
                    "-c:v", "libx264", "-b:v", "1600k", "-preset", "ultrafast", "-vf",
                    r#"drawtext=text='%{localtime\:%F %r}':fontcolor='#EE4245': x=0: y=0:fontsize=24'"#,
-                   "-x264opts", "keyint=50", "-g", "25", "-pix_fmt", "yuv420p", 
-                   "-f", "mpegts", r"udp://192.168.100.11:7998?pkt_size=1316",
-                   "-y",
-                   &save_location
+                   "-x264opts", "keyint=50", "-g", "25", "-pix_fmt", "yuv420p",
+                   "-f", "tee", "-map", "0:v", 
+                   &format!("{}|[f=mpegts]udp://192.168.100.11:7998?pkt_size=1316", &save_location),
                     ]).stdin(Stdio::null()).spawn()?;
                     cmd = Some(cmd_new);
 
