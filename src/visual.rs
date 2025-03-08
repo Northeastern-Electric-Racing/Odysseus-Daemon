@@ -55,7 +55,7 @@ pub async fn run_save_pipeline(
                        "-i",
                    &vid_opts.video,
                    "-c:v", "libx264", "-b:v", "1600k", "-preset", "ultrafast", "-vf",
-                   r#"drawtext="text='%{localtime\:%F %r}':fontcolor='#EE4245': x=0: y=0:fontsize=24'"#,
+                   r#"drawtext=text='%{localtime\:%F %r}':fontcolor='#EE4245': x=0: y=0:fontsize=24'"#,
                    "-x264opts", "keyint=50", "-g", "25", "-pix_fmt", "yuv420p", "-y",
                    &save_location
                     ]).stdin(Stdio::null()).spawn()?;
