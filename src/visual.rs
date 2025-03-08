@@ -47,6 +47,7 @@ pub async fn run_save_pipeline(
                     );
                     info!("Creating and launching ffmpeg...");
                     let cmd_new = Command::new("ffmpeg").args([
+                        "-nostdin",
                         "-f",
                      "v4l2",
                      "-framerate", "25",
