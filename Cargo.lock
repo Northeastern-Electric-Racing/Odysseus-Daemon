@@ -188,6 +188,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "cli-uploader"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "odysseus-uploader",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -885,6 +893,7 @@ name = "odysseus-daemon"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "odysseus-uploader",
  "protobuf",
  "protobuf-codegen",
  "rumqttc",
@@ -895,6 +904,13 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "odysseus-uploader"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
 ]
 
 [[package]]
@@ -1778,14 +1794,6 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
-
-[[package]]
-name = "uploader"
-version = "0.1.0"
-dependencies = [
- "clap",
- "reqwest",
-]
 
 [[package]]
 name = "url"

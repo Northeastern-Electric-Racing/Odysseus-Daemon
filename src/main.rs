@@ -64,6 +64,10 @@ struct VisualArgs {
     )]
     mqtt_url: String,
 
+    /// The Scylla URL
+    #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
+    scylla_url: String,
+
     /// The output folder of data (videos, audio, text logs, etc), no trailing slash
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
@@ -100,7 +104,7 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("Could not init tracing");
 
     // set save location
-    SAVE_LOCATION.get_or_init(|| cli.output_folder);
+    SAVE_LOCATION.get_or_init(|| cli.output_folder.clone());
 
     // channel to pass the mqtt data
     // TODO tune buffer size
@@ -139,6 +143,8 @@ async fn main() {
         mqtt_recv_tx,
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
+            scylla_url: cli.scylla_url,
+            output_folder: cli.output_folder,
         },
     );
     let (client, eventloop) = AsyncClient::new(opts, 600);

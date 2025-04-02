@@ -1,26 +1,8 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::{fs, path::Path};
 
-use clap::Parser;
 use reqwest::blocking::multipart;
 
-/// ody-visual command line arguments
-#[derive(Parser, Debug)]
-#[command(version)]
-struct UploaderArgs {
-    /// The output folder of data (videos, audio, text logs, etc), no trailing slash
-    #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
-    output_folder: String,
-
-    /// The URL of Scylla
-    #[arg(short = 'u', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
-    scylla_url: String,
-}
-
-/// Logger module: upload a data_dump.log file to scylla
-fn logger_upload(
+fn upload_file(
     filepath: &Path,
     scylla_uri: &str,
     client: &reqwest::blocking::Client,
@@ -39,14 +21,17 @@ fn logger_upload(
     Ok(())
 }
 
-fn main() {
-    let cli = UploaderArgs::parse();
-
+pub fn upload_files(
+    output_folder: &str,
+    scylla_url: &str,
+    upload_logs: bool,
+    upload_video: bool,
+    upload_serial: bool,
+) {
     let client = reqwest::blocking::Client::new();
 
-    let entries = fs::read_dir(Path::new(&cli.output_folder)).expect("Invalid data output folder!");
+    let entries = fs::read_dir(Path::new(output_folder)).expect("Invalid data output folder!");
 
-    println!("Traversing data");
     for entry in entries {
         match entry {
             Ok(dire) => {
@@ -69,13 +54,17 @@ fn main() {
                                     .file_type()
                                     .expect("Could not decode filetype")
                                     .is_file()
-                                    && dire.file_name() == "data_dump.log"
+                                    && ((upload_logs && dire.file_name() == "data_dump.log")
+                                        || (upload_video
+                                            && dire.file_name() == "ner24-frontcam.mp4")
+                                        || (upload_serial
+                                            && (dire.file_name() == "cerberus-dump.cap"
+                                                || dire.file_name() == "shepherd-dump.cap")))
                                 {
-                                    println!("Uploading log file: {:?}", dire.path());
-                                    if let Err(err) =
-                                        logger_upload(&dire.path(), &cli.scylla_url, &client)
+                                    println!("Uploading file: {:?}", dire.path());
+                                    if let Err(err) = upload_file(&dire.path(), scylla_url, &client)
                                     {
-                                        eprintln!("Failed to send log to scylla: {}", err);
+                                        eprintln!("Failed to send file to scylla: {}", err);
                                     }
                                 }
                             }
@@ -89,9 +78,4 @@ fn main() {
             Err(e) => eprintln!("Could not traverse folder {}", e),
         }
     }
-
-    println!(
-        "Done, feel free to clear the inside of the {} directory!",
-        cli.output_folder
-    );
 }

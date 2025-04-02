@@ -1,3 +1,4 @@
+use odysseus_uploader::upload_files;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -17,7 +18,7 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     playback_data, serverdata, HVTransition, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC,
-    SAVE_LOCATION,
+    SAVE_LOCATION, SEND_LOGGER_DATA, SEND_SERIAL_DATA, SEND_VIDEO_DATA,
 };
 
 /// The chief processor of incoming mqtt data, this handles
@@ -35,12 +36,17 @@ pub struct MqttProcessor {
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
     mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+    opts: MqttProcessorOptions,
 }
 
 /// processor options, these are static immutable settings
 pub struct MqttProcessorOptions {
     /// URI of the mqtt server
     pub mqtt_path: String,
+    /// URI of scylla
+    pub scylla_url: String,
+    /// The output path for the folder that contains the video, logger, and serial files
+    pub output_folder: String,
 }
 
 impl MqttProcessor {
@@ -86,6 +92,7 @@ impl MqttProcessor {
                 augment_hv_on,
                 mute_stat_send,
                 mqtt_recv_tx,
+                opts,
             },
             mqtt_opts,
         )
@@ -175,6 +182,21 @@ impl MqttProcessor {
                                     warn!("Received bad mute message!");
                                 }
                             },
+                            SEND_LOGGER_DATA => {
+                                if val == 1{
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
+                                }
+                            },
+                            SEND_SERIAL_DATA => {
+                                if val == 1{
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
+                                }
+                            },
+                            SEND_VIDEO_DATA => {
+                                if val == 1{
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
+                                }
+                            }
                             _ => {
                             }
                         }
