@@ -12,7 +12,7 @@ fn upload_file(
         .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file(format!("{:?}_{}", filepath.to_str(), timestamp), filepath)
+                .file(format!("{}_{:?}", timestamp, filepath.to_str()), filepath)
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
