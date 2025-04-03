@@ -4,14 +4,15 @@ use reqwest::blocking::multipart;
 
 fn upload_file(
     filepath: &Path,
+    timestamp: &str,
     scylla_uri: &str,
     client: &reqwest::blocking::Client,
 ) -> Result<(), reqwest::Error> {
     let res = client
-        .post(format!("{}/insert/file", scylla_uri))
+        .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file("", filepath)
+                .file(format!("{:?}_{}", filepath.to_str(), timestamp), filepath)
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
@@ -19,6 +20,10 @@ fn upload_file(
     res.error_for_status()?;
 
     Ok(())
+}
+
+fn extract_timestamp(input: &str) -> Option<&str> {
+    input.split_once('-').map(|(_, timestamp)| timestamp.trim())
 }
 
 pub fn upload_files(
@@ -49,22 +54,47 @@ pub fn upload_files(
                     let entries = fs::read_dir(dire.path()).expect("Invalid folder!");
                     for entry in entries {
                         match entry {
-                            Ok(dire) => {
-                                if dire
+                            Ok(file) => {
+                                if file
                                     .file_type()
                                     .expect("Could not decode filetype")
                                     .is_file()
-                                    && ((upload_logs && dire.file_name() == "data_dump.log")
-                                        || (upload_video
-                                            && dire.file_name() == "ner24-frontcam.mp4")
-                                        || (upload_serial
-                                            && (dire.file_name() == "cerberus-dump.cap"
-                                                || dire.file_name() == "shepherd-dump.cap")))
+                                    && upload_logs
+                                    && file.file_name() == "data_dump.log"
                                 {
-                                    println!("Uploading file: {:?}", dire.path());
-                                    if let Err(err) = upload_file(&dire.path(), scylla_url, &client)
-                                    {
+                                    println!("Uploading file: {:?}", file.path());
+                                    if let Err(err) = upload_file(
+                                        &file.path(),
+                                        "",
+                                        format!("{}/insert/log", scylla_url).as_str(),
+                                        &client,
+                                    ) {
                                         eprintln!("Failed to send file to scylla: {}", err);
+                                    }
+                                } else if file
+                                    .file_type()
+                                    .expect("Could not decode filetype")
+                                    .is_file()
+                                    && ((upload_video && file.file_name() == "ner24-frontcam.mp4")
+                                        || (upload_serial
+                                            && (file.file_name() == "cerberus-dump.cap"
+                                                || file.file_name() == "shepherd-dump.cap")))
+                                {
+                                    if let Some(directory_name) = dire.file_name().to_str() {
+                                        if let Some(timestamp) = extract_timestamp(directory_name) {
+                                            if let Err(err) = upload_file(
+                                                &file.path(),
+                                                timestamp,
+                                                format!("{}/insert/file", scylla_url).as_str(),
+                                                &client,
+                                            ) {
+                                                eprintln!("Failed to send file to scylla: {}", err);
+                                            }
+                                        } else {
+                                            eprintln!("Could not extract timestamp");
+                                        };
+                                    } else {
+                                        eprintln!("Could not get directory name");
                                     }
                                 }
                             }
