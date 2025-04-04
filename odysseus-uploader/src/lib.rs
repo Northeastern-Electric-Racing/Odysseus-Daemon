@@ -8,20 +8,21 @@ fn upload_file(
     scylla_uri: &str,
     client: &reqwest::blocking::Client,
 ) -> Result<(), reqwest::Error> {
+    let file_name = format!(
+        "{}_{}",
+        timestamp,
+        filepath
+            .to_str()
+            .expect("Could not convert filpath to string")
+    );
+
+    println!("File name: {}", file_name);
+
     let res = client
         .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file(
-                    format!(
-                        "{}_{}",
-                        timestamp,
-                        filepath
-                            .to_str()
-                            .expect("Could not convert filpath to string")
-                    ),
-                    filepath,
-                )
+                .file(file_name, filepath)
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
