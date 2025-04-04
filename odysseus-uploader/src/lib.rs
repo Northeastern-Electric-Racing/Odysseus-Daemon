@@ -1,13 +1,13 @@
 use std::{fs, path::Path};
 
-use reqwest::blocking::multipart;
+use reqwest::multipart;
 
-fn upload_file(
+async fn upload_file(
     filepath: &Path,
     timestamp: &str,
     file_name: &str,
     scylla_uri: &str,
-    client: &reqwest::blocking::Client,
+    client: &reqwest::Client,
 ) -> Result<(), reqwest::Error> {
     let file_name = format!("{}_{}", timestamp, file_name);
 
@@ -16,9 +16,11 @@ fn upload_file(
         .multipart(
             multipart::Form::new()
                 .file(file_name, filepath)
-                .expect("Could not fetch file for sending"),
+                .await
+                .expect("Failed to create multipart form"),
         )
-        .send()?;
+        .send()
+        .await?;
 
     res.error_for_status()?;
 
@@ -29,14 +31,14 @@ fn extract_timestamp(input: &str) -> Option<&str> {
     input.split_once('-').map(|(_, timestamp)| timestamp.trim())
 }
 
-pub fn upload_files(
+pub async fn upload_files(
     output_folder: &str,
     scylla_url: &str,
     upload_logs: bool,
     upload_video: bool,
     upload_serial: bool,
 ) {
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
 
     let entries = fs::read_dir(Path::new(output_folder)).expect("Invalid data output folder!");
 
@@ -72,7 +74,9 @@ pub fn upload_files(
                                         "",
                                         format!("{}/insert/log", scylla_url).as_str(),
                                         &client,
-                                    ) {
+                                    )
+                                    .await
+                                    {
                                         eprintln!("Failed to send file to scylla: {}", err);
                                     }
                                 } else if file
@@ -95,7 +99,9 @@ pub fn upload_files(
                                                     file_name,
                                                     format!("{}/insert/file", scylla_url).as_str(),
                                                     &client,
-                                                ) {
+                                                )
+                                                .await
+                                                {
                                                     eprintln!(
                                                         "Failed to send file to scylla: {}",
                                                         err
