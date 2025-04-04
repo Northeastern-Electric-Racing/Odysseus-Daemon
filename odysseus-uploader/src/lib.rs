@@ -12,6 +12,8 @@ fn upload_file(
     let file_name = format!("{}_{}", timestamp, file_name);
 
     println!("File name: {}", file_name);
+    println!("Exists: {}", filepath.exists());
+    println!("Is file: {}", filepath.is_file());
 
     let res = client
         .post(scylla_uri)
