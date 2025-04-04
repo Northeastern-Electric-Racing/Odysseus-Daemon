@@ -12,6 +12,8 @@ async fn upload_file(
 ) -> Result<(), reqwest::Error> {
     let file_name = format!("{}_{}", timestamp, file_name);
 
+    println!("Sending file: {}", file_name);
+
     let res = client
         .post(scylla_uri)
         .multipart(
