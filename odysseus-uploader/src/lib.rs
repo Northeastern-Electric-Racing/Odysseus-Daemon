@@ -40,7 +40,7 @@ fn extract_timestamp(input: &str) -> Option<String> {
     let datetime: DateTime<Utc> = Utc.timestamp_millis_opt(millis).single()?;
 
     // Format to MM/DD/YYYY-HH::mm::ss
-    Some(datetime.format("%m/%d/%Y-%H::%M::%S").to_string())
+    Some(datetime.format("%m-%d-%Y_%H_%M_%S").to_string())
 }
 
 pub fn upload_files(
