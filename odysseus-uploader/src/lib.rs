@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Duration};
 
 use reqwest::{multipart, Client};
 
@@ -19,6 +19,7 @@ async fn upload_file(
                 .await
                 .expect("Failed to create multipart form"),
         )
+        .timeout(Duration::from_secs(300)) // Five minute timeout to ensure that at least all the requests will eventually finish. Files shouldnt required this long to send ideally when using 2.4 Hermes
         .send()
         .await?;
 
@@ -41,7 +42,6 @@ pub fn upload_files(
     let output_folder = output_folder.to_string();
     let scylla_url = scylla_url.to_string();
 
-    // Fire-and-forget background thread
     tokio::spawn(async move {
         let client = Client::new();
 
