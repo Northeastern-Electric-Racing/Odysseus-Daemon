@@ -19,7 +19,7 @@ fn upload_file(
         .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file(file_name, filepath)
+                .file("video.mp4", filepath)
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
