@@ -37,5 +37,15 @@ pub const HV_EN_TOPIC: &str = "MPU/State/TSMS";
 /// the topic to listen for mute enable, 1 is on 0 is off
 pub const MUTE_EN_TOPIC: &str = "WHEEL/Buttons/Mute";
 
+/// the topic to listen for when to send video to scylla, 1 means send
+pub const SEND_VIDEO_DATA: &str = "Scylla/Video/Send";
+
+/// the topic to listen for when to send logger data to scylla, 1 means send
+pub const SEND_LOGGER_DATA: &str = "Scylla/Logger/Send";
+
+/// the topic to listen for when to send serial data to scylla, 1 means send
+pub const SEND_SERIAL_DATA: &str = "Scylla/Serial/Send";
+
+///pub const SEND_
 /// The save location for all files
 pub static SAVE_LOCATION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
