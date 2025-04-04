@@ -5,16 +5,11 @@ use reqwest::blocking::multipart;
 fn upload_file(
     filepath: &Path,
     timestamp: &str,
+    file_name: &str,
     scylla_uri: &str,
     client: &reqwest::blocking::Client,
 ) -> Result<(), reqwest::Error> {
-    let file_name = format!(
-        "{}_{}",
-        timestamp,
-        filepath
-            .to_str()
-            .expect("Could not convert filpath to string")
-    );
+    let file_name = format!("{}_{}", timestamp, file_name);
 
     println!("File name: {}", file_name);
 
@@ -76,6 +71,7 @@ pub fn upload_files(
                                     if let Err(err) = upload_file(
                                         &file.path(),
                                         "",
+                                        "",
                                         format!("{}/insert/log", scylla_url).as_str(),
                                         &client,
                                     ) {
@@ -92,17 +88,27 @@ pub fn upload_files(
                                 {
                                     println!("Inserting file to: {}/insert/file", scylla_url);
                                     if let Some(directory_name) = dire.file_name().to_str() {
-                                        if let Some(timestamp) = extract_timestamp(directory_name) {
-                                            if let Err(err) = upload_file(
-                                                &file.path(),
-                                                timestamp,
-                                                format!("{}/insert/file", scylla_url).as_str(),
-                                                &client,
-                                            ) {
-                                                eprintln!("Failed to send file to scylla: {}", err);
+                                        if let Some(file_name) = file.file_name().to_str() {
+                                            if let Some(timestamp) =
+                                                extract_timestamp(directory_name)
+                                            {
+                                                if let Err(err) = upload_file(
+                                                    &file.path(),
+                                                    timestamp,
+                                                    file_name,
+                                                    format!("{}/insert/file", scylla_url).as_str(),
+                                                    &client,
+                                                ) {
+                                                    eprintln!(
+                                                        "Failed to send file to scylla: {}",
+                                                        err
+                                                    );
+                                                }
+                                            } else {
+                                                eprintln!("Could not extract timestamp");
                                             }
                                         } else {
-                                            eprintln!("Could not extract timestamp");
+                                            eprintln!("Could not get file name");
                                         };
                                     } else {
                                         eprintln!("Could not get directory name");
