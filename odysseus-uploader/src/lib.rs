@@ -11,15 +11,11 @@ fn upload_file(
 ) -> Result<(), reqwest::Error> {
     let file_name = format!("{}_{}", timestamp, file_name);
 
-    println!("File name: {}", file_name);
-    println!("Exists: {}", filepath.exists());
-    println!("Is file: {}", filepath.is_file());
-
     let res = client
         .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file("video.mp4", filepath)
+                .file(file_name, filepath)
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
@@ -88,7 +84,6 @@ pub fn upload_files(
                                             && (file.file_name() == "cerberus-dump.cap"
                                                 || file.file_name() == "shepherd-dump.cap")))
                                 {
-                                    println!("Inserting file to: {}/insert/file", scylla_url);
                                     if let Some(directory_name) = dire.file_name().to_str() {
                                         if let Some(file_name) = file.file_name().to_str() {
                                             if let Some(timestamp) =
