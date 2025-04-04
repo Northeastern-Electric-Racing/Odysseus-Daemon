@@ -12,7 +12,16 @@ fn upload_file(
         .post(scylla_uri)
         .multipart(
             multipart::Form::new()
-                .file(format!("{}_{:?}", timestamp, filepath.to_str()), filepath)
+                .file(
+                    format!(
+                        "{}_{}",
+                        timestamp,
+                        filepath
+                            .to_str()
+                            .expect("Could not convert filpath to string")
+                    ),
+                    filepath,
+                )
                 .expect("Could not fetch file for sending"),
         )
         .send()?;
@@ -80,6 +89,7 @@ pub fn upload_files(
                                             && (file.file_name() == "cerberus-dump.cap"
                                                 || file.file_name() == "shepherd-dump.cap")))
                                 {
+                                    println!("Inserting file to: {}/insert/file", scylla_url);
                                     if let Some(directory_name) = dire.file_name().to_str() {
                                         if let Some(timestamp) = extract_timestamp(directory_name) {
                                             if let Err(err) = upload_file(
