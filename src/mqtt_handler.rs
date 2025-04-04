@@ -186,21 +186,21 @@ impl MqttProcessor {
                                 println!("Sending Logger Data, {}", val);
 
                                 if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false).await;
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
                                 }
                             },
                             SEND_SERIAL_DATA => {
                                 println!("Sending Serial Data, {}", val);
 
                                 if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true).await;
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
                                 }
                             },
                             SEND_VIDEO_DATA => {
                                 println!("Sending Video Data, {}", val);
 
                                 if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false).await;
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
                                 }
                             }
                             _ => {
