@@ -1,10 +1,11 @@
 use std::{fs, path::Path, time::Duration};
 
+use chrono::{DateTime, TimeZone, Utc};
 use reqwest::{multipart, Client};
 
 async fn upload_file(
     filepath: &Path,
-    timestamp: &str,
+    timestamp: String,
     file_name: &str,
     scylla_uri: &str,
     client: &reqwest::Client,
@@ -28,8 +29,16 @@ async fn upload_file(
     Ok(())
 }
 
-fn extract_timestamp(input: &str) -> Option<&str> {
-    input.split_once('-').map(|(_, timestamp)| timestamp.trim())
+fn extract_timestamp(input: &str) -> Option<String> {
+    // Split on the first '-' and parse the timestamp
+    let raw_ts = input.split_once('-')?.1.trim();
+
+    // Parse as milliseconds since epoch
+    let millis: i64 = raw_ts.parse().ok()?;
+    let datetime: DateTime<Utc> = Utc.timestamp_millis_opt(millis).single()?;
+
+    // Format to MM/DD/YYYY-HH::mm::ss
+    Some(datetime.format("%m/%d/%Y-%H::%M::%S").to_string())
 }
 
 pub fn upload_files(
@@ -79,7 +88,7 @@ pub fn upload_files(
                                         let scylla_url = scylla_url.clone();
                                         if let Err(err) = upload_file(
                                             &path,
-                                            "",
+                                            "".to_string(),
                                             "",
                                             format!("{}/insert/log", scylla_url).as_str(),
                                             &client,
