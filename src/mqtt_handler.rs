@@ -184,29 +184,23 @@ impl MqttProcessor {
                             },
                             SEND_LOGGER_DATA => {
                                 if !last_stat {
-                                    println!("Sending Logger Data, {}", val);
+                                    debug!("Sending Logger Data, {}", val);
 
-                                    if val == 1 {
-                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
-                                    }
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
                                 }
                             },
                             SEND_SERIAL_DATA => {
                                 if !last_stat {
-                                    println!("Sending Serial Data, {}", val);
+                                    debug!("Sending Serial Data, {}", val);
 
-                                    if val == 1 {
-                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
-                                    }
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
                                 }
                             },
                             SEND_VIDEO_DATA => {
                                 if !last_stat {
-                                    println!("Sending Video Data, {}", val);
+                                    debug!("Sending Video Data, {}", val);
 
-                                    if val == 1 {
-                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
-                                    }
+                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
                                 }
                             }
                             _ => {
