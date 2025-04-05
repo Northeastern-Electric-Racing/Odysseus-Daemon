@@ -165,8 +165,8 @@ impl MqttProcessor {
                                         last_stat = true;
                                     } else if val == 0 && last_stat {
                                         debug!("Transitioning states to HV off");
-                                       self.hv_stat_send.send(HVTransition::TransitionOff).expect("HV Stat Channel Closed");
-                                       last_stat = false;
+                                        self.hv_stat_send.send(HVTransition::TransitionOff).expect("HV Stat Channel Closed");
+                                        last_stat = false;
                                     } else if val != 0 && val != 1 {
                                         warn!("Received bad HV message!");
                                     }
@@ -183,24 +183,30 @@ impl MqttProcessor {
                                 }
                             },
                             SEND_LOGGER_DATA => {
-                                println!("Sending Logger Data, {}", val);
+                                if !last_stat {
+                                    println!("Sending Logger Data, {}", val);
 
-                                if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
+                                    if val == 1 {
+                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
+                                    }
                                 }
                             },
                             SEND_SERIAL_DATA => {
-                                println!("Sending Serial Data, {}", val);
+                                if !last_stat {
+                                    println!("Sending Serial Data, {}", val);
 
-                                if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
+                                    if val == 1 {
+                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
+                                    }
                                 }
                             },
                             SEND_VIDEO_DATA => {
-                                println!("Sending Video Data, {}", val);
+                                if !last_stat {
+                                    println!("Sending Video Data, {}", val);
 
-                                if val == 1{
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
+                                    if val == 1 {
+                                        upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
+                                    }
                                 }
                             }
                             _ => {
