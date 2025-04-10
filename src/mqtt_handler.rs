@@ -24,7 +24,7 @@ use crate::{
 /// The chief processor of incoming mqtt data, this handles
 /// - mqtt state
 /// - reception via mqtt and subsequent parsing
-///     Takes in many channels:
+///   Takes in many channels:
 /// - mqtt_sender_rx: A receiver of any messages, it then publishes them
 /// - hv_stat_send: A sender of the current HV state (only if it changes!), will be set to ON if augment_hv_on is true
 /// - mute_stat_send: A sender of the current mute button state
