@@ -45,8 +45,6 @@ pub struct MqttProcessorOptions {
     pub mqtt_path: String,
     /// URI of scylla
     pub scylla_url: String,
-    /// The output path for the folder that contains the video, logger, and serial files
-    pub output_folder: String,
 }
 
 impl MqttProcessor {
@@ -186,21 +184,21 @@ impl MqttProcessor {
                                 if !last_stat {
                                     debug!("Sending Logger Data, {}", val);
 
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, true, false, false);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, true, false, false);
                                 }
                             },
                             SEND_SERIAL_DATA => {
                                 if !last_stat {
                                     debug!("Sending Serial Data, {}", val);
 
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, false, true);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, false, true);
                                 }
                             },
                             SEND_VIDEO_DATA => {
                                 if !last_stat {
                                     debug!("Sending Video Data, {}", val);
 
-                                    upload_files(&self.opts.output_folder, &self.opts.scylla_url, false, true, false);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, true, false);
                                 }
                             }
                             _ => {

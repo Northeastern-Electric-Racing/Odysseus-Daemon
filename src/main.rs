@@ -144,7 +144,6 @@ async fn main() {
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
             scylla_url: cli.scylla_url,
-            output_folder: cli.output_folder,
         },
     );
     let (client, eventloop) = AsyncClient::new(opts, 600);

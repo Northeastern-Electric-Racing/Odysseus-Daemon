@@ -14,15 +14,15 @@ struct UploaderArgs {
     scylla_url: String,
 
     /// Whether to send logger data
-    #[arg(short = 'l', long, env = "SEND_LOGGER_DATA")]
+    #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_SEND_LOGGER_DATA")]
     send_logger: bool,
 
     /// Whether to send video data
-    #[arg(short = 'v', long, env = "SEND_VIDEO_DATA")]
+    #[arg(short = 'v', long, env = "ODYSSEUS_DAEMON_SEND_VIDEO_DATA")]
     send_video: bool,
 
     /// Whether to send serial data
-    #[arg(short = 's', long, env = "SEND_SERIAL_DATA")]
+    #[arg(short = 's', long, env = "ODYSSEUS_DAEMON_SEND_SERIAL_DATA")]
     send_serial: bool,
 }
 
