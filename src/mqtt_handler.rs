@@ -1,3 +1,4 @@
+use odysseus_uploader::upload_files;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -17,13 +18,13 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     playback_data, serverdata, HVTransition, PublishableMessage, HV_EN_TOPIC, MUTE_EN_TOPIC,
-    SAVE_LOCATION,
+    SAVE_LOCATION, SEND_LOGGER_DATA, SEND_SERIAL_DATA, SEND_VIDEO_DATA,
 };
 
 /// The chief processor of incoming mqtt data, this handles
 /// - mqtt state
 /// - reception via mqtt and subsequent parsing
-///     Takes in many channels:
+///   Takes in many channels:
 /// - mqtt_sender_rx: A receiver of any messages, it then publishes them
 /// - hv_stat_send: A sender of the current HV state (only if it changes!), will be set to ON if augment_hv_on is true
 /// - mute_stat_send: A sender of the current mute button state
@@ -35,12 +36,15 @@ pub struct MqttProcessor {
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
     mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+    opts: MqttProcessorOptions,
 }
 
 /// processor options, these are static immutable settings
 pub struct MqttProcessorOptions {
     /// URI of the mqtt server
     pub mqtt_path: String,
+    /// URI of scylla
+    pub scylla_url: String,
 }
 
 impl MqttProcessor {
@@ -86,6 +90,7 @@ impl MqttProcessor {
                 augment_hv_on,
                 mute_stat_send,
                 mqtt_recv_tx,
+                opts,
             },
             mqtt_opts,
         )
@@ -158,8 +163,8 @@ impl MqttProcessor {
                                         last_stat = true;
                                     } else if val == 0 && last_stat {
                                         debug!("Transitioning states to HV off");
-                                       self.hv_stat_send.send(HVTransition::TransitionOff).expect("HV Stat Channel Closed");
-                                       last_stat = false;
+                                        self.hv_stat_send.send(HVTransition::TransitionOff).expect("HV Stat Channel Closed");
+                                        last_stat = false;
                                     } else if val != 0 && val != 1 {
                                         warn!("Received bad HV message!");
                                     }
@@ -175,6 +180,27 @@ impl MqttProcessor {
                                     warn!("Received bad mute message!");
                                 }
                             },
+                            SEND_LOGGER_DATA => {
+                                if !last_stat {
+                                    debug!("Sending Logger Data, {}", val);
+
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, true, false, false);
+                                }
+                            },
+                            SEND_SERIAL_DATA => {
+                                if !last_stat {
+                                    debug!("Sending Serial Data, {}", val);
+
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, false, true);
+                                }
+                            },
+                            SEND_VIDEO_DATA => {
+                                if !last_stat {
+                                    debug!("Sending Video Data, {}", val);
+
+                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, true, false);
+                                }
+                            }
                             _ => {
                             }
                         }
