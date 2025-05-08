@@ -15,16 +15,18 @@ use crate::{HVTransition, SAVE_LOCATION};
 pub async fn lockdown_runner(
     cancel_token: CancellationToken,
     mut hv_stat_recv: Receiver<HVTransition>,
+    usbs: Vec<String>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut cmds: Option<(Child, Child)> = None;
-    if let Err(err) = hv_transition_disabled(&mut cmds).await {
+    info!("Unlocking initially!");
+    if let Err(err) = hv_transition_disabled(&mut cmds, &usbs).await {
         warn!("Could not unlock!!! {}", err);
     }
 
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
-                if let Err(err) = hv_transition_disabled(&mut cmds).await {
+                if let Err(err) = hv_transition_disabled(&mut cmds, &usbs).await {
                     warn!("Could not unlock!!! {}", err);
                 }
                 break Ok(());
@@ -35,7 +37,7 @@ pub async fn lockdown_runner(
                  match curr_data {
                     HVTransition::TransitionOn(hvon_data) => {
                         info!("Locking down!");
-                        let Ok(children) = hv_transition_enabled(hvon_data.time_ms).await else {
+                        let Ok(children) = hv_transition_enabled(hvon_data.time_ms, &usbs).await else {
                             warn!("Could not lock down!!!");
                             continue;
                         };
@@ -43,7 +45,7 @@ pub async fn lockdown_runner(
                     },
                     HVTransition::TransitionOff => {
                         info!("Unlocking!");
-                    if let Err(err) = hv_transition_disabled(&mut cmds).await {
+                    if let Err(err) = hv_transition_disabled(&mut cmds, &usbs).await {
                         warn!("Could not unlock!!! {}", err);
                     }
                     },
@@ -55,18 +57,15 @@ pub async fn lockdown_runner(
 }
 
 /// Transition to HV on
-pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
+pub async fn hv_transition_enabled(time_ms: u64, usbs: &Vec<String>) -> io::Result<(Child, Child)> {
     // unbind from the usbipd server
-    // this automatically brings back
-    let mut cmd_cerb_dis = Command::new("usbip")
-        .args(["unbind", "--busid", "1-1.3"])
-        .spawn()?;
-    let mut cmd_shep_dis = Command::new("usbip")
-        .args(["unbind", "--busid", "1-1.4"])
-        .spawn()?;
-
-    cmd_cerb_dis.wait().await?;
-    cmd_shep_dis.wait().await?;
+    for item in usbs {
+        Command::new("usbip")
+            .args(["unbind", "--busid", item])
+            .spawn()?
+            .wait()
+            .await?;
+    }
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -123,16 +122,18 @@ pub async fn hv_transition_enabled(time_ms: u64) -> io::Result<(Child, Child)> {
 }
 
 /// Transition to HV off
-pub async fn hv_transition_disabled(child_writers: &mut Option<(Child, Child)>) -> io::Result<()> {
-    let mut cmd_cerb_rec = Command::new("usbip")
-        .args(["bind", "--busid", "1-1.3"])
-        .spawn()?;
-    let mut cmd_shep_rec = Command::new("usbip")
-        .args(["bind", "--busid", "1-1.4"])
-        .spawn()?;
-
-    cmd_cerb_rec.wait().await?;
-    cmd_shep_rec.wait().await?;
+pub async fn hv_transition_disabled(
+    child_writers: &mut Option<(Child, Child)>,
+    usbs: &Vec<String>,
+) -> io::Result<()> {
+    // bind to the usbipd daemon
+    for usb in usbs {
+        Command::new("usbip")
+            .args(["bind", "--busid", usb])
+            .spawn()?
+            .wait()
+            .await?;
+    }
 
     if let Some(child_writers) = child_writers {
         child_writers.0.kill().await?;
