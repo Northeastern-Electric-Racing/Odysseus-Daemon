@@ -35,6 +35,10 @@ struct VisualArgs {
     #[arg(short = 's', long, env = "ODYSSEUS_DAEMON_LOCKDOWN_ENABLE")]
     lockdown: bool,
 
+    /// USB device ports (as seen on usbip list -l) to lock down
+    #[arg(long, env = "ODYSSEUS_DAEMON_LOCKDOWN_USBS", num_args = 1..4)]
+    usbs_locked: Option<Vec<String>>,
+
     /// Enable audio module
     #[arg(short = 'a', long, env = "ODYSSEUS_DAEMON_AUDIBLE_ENABLE")]
     audible: bool,
@@ -171,7 +175,12 @@ async fn main() {
 
     if cli.lockdown {
         info!("Running lockdown module");
-        task_tracker.spawn(lockdown_runner(token.clone(), hv_stat_recv.clone()));
+        task_tracker.spawn(lockdown_runner(
+            token.clone(),
+            hv_stat_recv.clone(),
+            cli.usbs_locked
+                .expect("USBs required when enabling lockdown module"),
+        ));
     }
 
     if cli.audible {
