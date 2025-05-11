@@ -49,7 +49,7 @@ pub fn upload_files(
     upload_logs: bool,
     upload_video: bool,
     upload_serial: bool,
-) {
+) -> tokio::task::JoinHandle<()> {
     let output_folder = output_folder.to_string();
     let scylla_url = scylla_url.to_string();
 
@@ -149,7 +149,7 @@ pub fn upload_files(
                 Err(e) => eprintln!("Could not traverse folder {}", e),
             }
         }
-    });
+    })
 
     // Function returns immediately
 }

@@ -26,16 +26,19 @@ struct UploaderArgs {
     send_serial: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = UploaderArgs::parse();
 
-    upload_files(
+    let thread = upload_files(
         &cli.output_folder,
         &cli.scylla_url,
         cli.send_logger,
         cli.send_video,
         cli.send_serial,
     );
+
+    thread.await.expect("Upload failed");
 
     println!(
         "Done, feel free to clear the inside of the {} directory!",
