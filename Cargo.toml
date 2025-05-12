@@ -3,18 +3,11 @@ name = "odysseus-daemon"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = [ "odysseus-uploader" ]
-
-[workspace.dependencies]
+[dependencies]
 reqwest = { version = "0.12.12", features = ["blocking", "multipart", "stream"] }
 clap = { version = "4.5.30", features = ["derive", "env"] }
 tokio = { version = "1.43.0", features = ["full", "tracing"] }
 chrono = { version = "0.4.40" }
-
-[dependencies]
-clap.workspace = true
-tokio.workspace = true
 protobuf = "3.7.1"
 rumqttc = "0.24.0"
 serde = { version = "1.0.218", features = ["derive"] }
@@ -23,7 +16,6 @@ sysinfo = "0.33.1"
 tokio-util = { version = "0.7.14", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["ansi", "env-filter"] }
-odysseus-uploader = { path = "./odysseus-uploader" }
 
 [build-dependencies]
 protobuf-codegen = "3.7.1"

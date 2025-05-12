@@ -1,5 +1,5 @@
 use clap::Parser;
-use odysseus_uploader::upload_files;
+use odysseus_daemon::uploader::upload_files;
 
 /// ody-visual command line arguments
 #[derive(Parser, Debug)]

@@ -1,4 +1,5 @@
 pub mod mqtt_handler;
+pub mod uploader;
 
 // MODULES
 pub mod audible;
