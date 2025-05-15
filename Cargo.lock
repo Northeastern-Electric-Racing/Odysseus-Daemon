@@ -919,6 +919,7 @@ dependencies = [
  "clap",
  "protobuf",
  "protobuf-codegen",
+ "regex",
  "reqwest",
  "rumqttc",
  "serde",

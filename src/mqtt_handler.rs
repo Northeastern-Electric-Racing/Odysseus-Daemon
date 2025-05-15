@@ -5,7 +5,10 @@ use std::{
 
 use protobuf::{Message, SpecialFields};
 use rumqttc::v5::{
-    mqttbytes::{v5::Packet, QoS},
+    mqttbytes::{
+        v5::{Packet, Publish},
+        QoS,
+    },
     AsyncClient, Event, EventLoop, MqttOptions,
 };
 use tokio::sync::{
@@ -35,6 +38,7 @@ pub struct MqttProcessor {
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
     mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+    mqtt_sys_send: Option<mpsc::Sender<Publish>>,
     opts: MqttProcessorOptions,
 }
 
@@ -55,6 +59,7 @@ impl MqttProcessor {
         augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
         mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+        mqtt_sys_send: Option<mpsc::Sender<Publish>>,
         opts: MqttProcessorOptions,
     ) -> (MqttProcessor, MqttOptions) {
         // create the mqtt client and configure it
@@ -89,6 +94,7 @@ impl MqttProcessor {
                 augment_hv_on,
                 mute_stat_send,
                 mqtt_recv_tx,
+                mqtt_sys_send,
                 opts,
             },
             mqtt_opts,
@@ -104,6 +110,13 @@ impl MqttProcessor {
             .subscribe("#", rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
             .await
             .expect("Could not subscribe to Siren");
+        if self.mqtt_sys_send.is_some() {
+            debug!("Subscribing to $SYS");
+            client
+                .subscribe("$SYS/#", rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
+                .await
+                .expect("Could not subscribe to Siren");
+        }
 
         // if augment HV on, send as such, otherwise start default off
         let mut last_stat = if self.augment_hv_on {
@@ -138,14 +151,25 @@ impl MqttProcessor {
                 },
                 msg = eventloop.poll() => match msg {
                     Ok(Event::Incoming(Packet::Publish(msg))) => {
-                        let Ok(res) = serverdata::ServerData::parse_from_bytes(&msg.payload) else {
-                            warn!("Recieved unparsable mqtt message.");
-                            continue;
-                        };
                         let Ok(topic) = std::str::from_utf8(&msg.topic) else {
                             warn!("Could not parse topic, topic: {:?}", msg.topic);
                             continue;
                         };
+                        if let Some(ref sender) = self.mqtt_sys_send {
+                            if topic.starts_with("$SYS") {
+                            if let Err(err) = sender.send(msg).await {
+                                warn!("Could not send to SYS processor: {}", err);
+                            }
+                            continue;
+                            }
+                        };
+
+
+                        let Ok(res) = serverdata::ServerData::parse_from_bytes(&msg.payload) else {
+                            warn!("Recieved unparsable mqtt message.");
+                            continue;
+                        };
+
                         let val = *res.values.first().unwrap_or(&-1f32) as u8;
                         match topic {
                             HV_EN_TOPIC => {

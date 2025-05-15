@@ -6,6 +6,7 @@ pub mod audible;
 pub mod lockdown;
 pub mod logger;
 pub mod numerical;
+pub mod sys_parser;
 pub mod visual;
 
 // PROTOBUF
@@ -15,7 +16,7 @@ pub mod serverdata;
 /// A message to be sent
 #[derive(std::fmt::Debug)]
 pub struct PublishableMessage {
-    pub topic: &'static str,
+    pub topic: String,
     pub data: Vec<f32>,
     pub unit: &'static str,
 }
