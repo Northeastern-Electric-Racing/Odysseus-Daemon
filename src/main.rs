@@ -11,10 +11,11 @@ use odysseus_daemon::{
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
     numerical::collect_data,
     playback_data,
+    sys_parser::sys_parser,
     visual::{run_save_pipeline, SavePipelineOpts},
     HVTransition, PublishableMessage, SAVE_LOCATION,
 };
-use rumqttc::v5::AsyncClient;
+use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
 use tokio::{
     signal,
     sync::{mpsc, watch},
@@ -54,6 +55,10 @@ struct VisualArgs {
     /// Enable video module
     #[arg(short = 'v', long, env = "ODYSSEUS_DAEMON_VIDEO_ENABLE")]
     video: bool,
+
+    /// Enable Mosquitto SYS translator module
+    #[arg(long, env = "ODYSSEUS_DAEMON_SYS_ENABLE")]
+    sys: bool,
 
     /// The input video file
     #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
@@ -114,6 +119,13 @@ async fn main() {
     // TODO tune buffer size
     let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
 
+    let (mqtt_sys_tx, mqtt_sys_rx) = if cli.sys {
+        let res = mpsc::channel::<Publish>(100);
+        (Some(res.0), Some(res.1))
+    } else {
+        (None, None)
+    };
+
     let (hv_stat_send, hv_stat_recv) = watch::channel(HVTransition::TransitionOff);
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
@@ -145,6 +157,7 @@ async fn main() {
         cli.mock,
         mute_stat_send,
         mqtt_recv_tx,
+        mqtt_sys_tx,
         MqttProcessorOptions {
             mqtt_path: cli.mqtt_url,
             scylla_url: cli.scylla_url,
@@ -193,6 +206,14 @@ async fn main() {
             token.clone(),
             mqtt_recv_rx.unwrap(),
             hv_stat_recv.clone(),
+        ));
+    }
+    if cli.sys {
+        info!("Running SYS translator");
+        task_tracker.spawn(sys_parser(
+            token.clone(),
+            mqtt_sys_rx.unwrap(),
+            mqtt_sender_tx,
         ));
     }
 
