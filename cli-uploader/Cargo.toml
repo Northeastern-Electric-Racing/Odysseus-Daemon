@@ -1,9 +1,0 @@
-[package]
-name = "cli-uploader"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-clap.workspace = true
-tokio.workspace = true
-odysseus-uploader = { path = "../odysseus-uploader" }
