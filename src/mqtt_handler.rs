@@ -50,6 +50,7 @@ pub struct MqttProcessorOptions {
     pub scylla_url: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl MqttProcessor {
     /// Creates a new mqtt receiver and sender
     pub fn new(
