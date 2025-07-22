@@ -6,6 +6,7 @@ use std::{
 use clap::Parser;
 use odysseus_daemon::{
     audible::audible_manager,
+    daq::collect_daq,
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
@@ -47,6 +48,14 @@ struct VisualArgs {
     /// Enable data module
     #[arg(short = 'd', long, env = "ODYSSEUS_DAEMON_DATA_ENABLE")]
     data: bool,
+
+    /// Enable daq module
+    #[arg(long, env = "ODYSSEUS_DAEMON_DAQ_ENABLE")]
+    daq: bool,
+
+    /// Daq USB device
+    #[arg(long, env = "ODYSSEUS_DAEMON_DAQ_DEVICE")]
+    daq_device: Option<String>,
 
     /// Enable logger
     #[arg(long, env = "ODYSSEUS_DAEMON_LOGGER_ENABLE")]
@@ -184,6 +193,14 @@ async fn main() {
     if cli.data {
         info!("Running TPU data collector");
         task_tracker.spawn(collect_data(token.clone(), mqtt_sender_tx.clone()));
+    }
+    if cli.daq {
+        info!("Running DAQ data collector");
+        task_tracker.spawn(collect_daq(
+            token.clone(),
+            cli.daq_device.expect("Require daq device"),
+            mqtt_sender_tx.clone(),
+        ));
     }
 
     if cli.lockdown {

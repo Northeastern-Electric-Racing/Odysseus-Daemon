@@ -3,6 +3,7 @@ pub mod uploader;
 
 // MODULES
 pub mod audible;
+pub mod daq;
 pub mod lockdown;
 pub mod logger;
 pub mod numerical;
@@ -19,6 +20,7 @@ pub struct PublishableMessage {
     pub topic: String,
     pub data: Vec<f32>,
     pub unit: &'static str,
+    pub time: u64,
 }
 
 /// Indicate a HV transition

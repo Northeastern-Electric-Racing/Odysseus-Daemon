@@ -10,9 +10,9 @@ async fn upload_file(
     scylla_uri: &str,
     client: &reqwest::Client,
 ) -> Result<(), reqwest::Error> {
-    let file_name = format!("{}_{}", timestamp, file_name);
+    let file_name = format!("{timestamp}_{file_name}");
 
-    println!("Sending file: {}", file_name);
+    println!("Sending file: {file_name}");
 
     let res = client
         .post(scylla_uri)
@@ -85,19 +85,19 @@ pub fn upload_files(
                                     let path = file.path();
 
                                     if is_file && upload_logs && file_name == "data_dump.log" {
-                                        println!("Uploading file: {:?}", path);
+                                        println!("Uploading file: {path:?}");
                                         let client = client.clone();
                                         let scylla_url = scylla_url.clone();
                                         if let Err(err) = upload_file(
                                             &path,
                                             "".to_string(),
                                             "",
-                                            format!("{}/insert/log", scylla_url).as_str(),
+                                            format!("{scylla_url}/insert/log").as_str(),
                                             &client,
                                         )
                                         .await
                                         {
-                                            eprintln!("Failed to send file to scylla: {}", err);
+                                            eprintln!("Failed to send file to scylla: {err}");
                                         }
                                     } else if is_file
                                         && ((upload_video && file_name == "ner24-frontcam.mp4")
@@ -117,15 +117,14 @@ pub fn upload_files(
                                                         &path,
                                                         timestamp,
                                                         file_name,
-                                                        format!("{}/insert/file", scylla_url)
+                                                        format!("{scylla_url}/insert/file")
                                                             .as_str(),
                                                         &client,
                                                     )
                                                     .await
                                                     {
                                                         eprintln!(
-                                                            "Failed to send file to scylla: {}",
-                                                            err
+                                                            "Failed to send file to scylla: {err}"
                                                         );
                                                     }
                                                 } else {
@@ -139,14 +138,14 @@ pub fn upload_files(
                                         }
                                     }
                                 }
-                                Err(e) => eprintln!("Could not traverse folder {}", e),
+                                Err(e) => eprintln!("Could not traverse folder {e}"),
                             }
                         }
                     } else {
-                        eprintln!("Invalid item: {:?}", dire);
+                        eprintln!("Invalid item: {dire:?}");
                     }
                 }
-                Err(e) => eprintln!("Could not traverse folder {}", e),
+                Err(e) => eprintln!("Could not traverse folder {e}"),
             }
         }
     })

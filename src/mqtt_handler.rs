@@ -130,8 +130,7 @@ impl MqttProcessor {
                 std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), time))
             {
                 panic!(
-                    "Could not create folder for data, bailing out of this loop! {}",
-                    err
+                    "Could not create folder for data, bailing out of this loop! {err}"
                 );
             }
             self.hv_stat_send
@@ -246,9 +245,7 @@ impl MqttProcessor {
                             let mut payload = serverdata::ServerData::new();
                             payload.unit = sendable.unit.to_string();
                             payload.values = sendable.data;
-                            payload.time_us =  SystemTime::now()
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("Time went backwards").as_micros() as u64;
+                            payload.time_us =  sendable.time;
                             let Ok(bytes) = protobuf::Message::write_to_bytes(&payload) else {
                                 warn!("Failed to serialize protobuf message!");
                                 continue;
