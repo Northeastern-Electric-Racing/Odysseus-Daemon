@@ -6,7 +6,7 @@ use std::{
 use serialport::TTYPort;
 use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, trace, warn};
 
 use crate::PublishableMessage;
 
