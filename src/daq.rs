@@ -6,7 +6,7 @@ use std::{
 use serialport::TTYPort;
 use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::PublishableMessage;
 
@@ -33,34 +33,54 @@ pub async fn collect_daq(
             },
             _ = reader_time.tick() => {
                 buf.clear();
-                let time = UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
-                match reader.read_line(&mut buf) {
+                // first go until $
+                match reader.skip_until(0x24) {
                     Ok(res) => {
-                        trace!("Read {} bytes from DAQ", res);
+                        trace!("Read {} garbage bytes from DAQ", res);
                     },
-                    Err(e) => warn!("Failed to read DAQ buffer: {}", e),
+                    Err(_) =>  {
+                        //trace!("Failed to read DAQ buffer: {}", e);
+                        continue;
+                     }
                 }
+                // then busy poll until we get the full data, with rl lockout
+                let time: u64 = loop {
+                     match reader.read_line(&mut buf) {
+                        Ok(res) => {
+                            trace!("Read {} bytes from DAQ", res);
+                            break UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
+                         },
+                         Err(_) =>  {
+                             //trace!("Failed to read DAQ buffer: {}", e);
+                             continue;
+                          }
+                     };
+                };
+                buf.pop(); // get rid of newline
+                // split up the points
                 let res: Vec<_> = buf.split(',').collect();
-                let mut clean_res: Vec<f32> = Vec::new();
+                if res.len() < 10 {
+                    warn!("Under found samples: {}", buf);
+                    continue;
+                }
+
+                // clean up the points
+                let mut clean_res: Vec<u64> = Vec::new();
                 for item in res {
-                    match item.parse::<f32>() {
+                    match item.parse::<u64>() {
                         // the inches conversion
-                        Ok(val) => clean_res.push((val / 4095.0) * 54.44 * (1.0/25.4)),
+                        Ok(val) => clean_res.push(val ),
                         Err(e) => warn!("Invalid byte from DAQ: {}", e),
                     }
                 }
 
-                if clean_res.len() < 10 {
-                    warn!("Under found samples");
-                    continue;
-                }
 
                 vec![PublishableMessage {
                     topic:"TPU/DAQ/Shockpots".to_string(),
-                data:vec![*clean_res.first().unwrap(),
-                *clean_res.get(1).unwrap(), *clean_res.get(2).unwrap(), *clean_res.get(3).unwrap()], unit: "in",
+                data:vec![conv_shock(*clean_res.first().unwrap()),
+                conv_shock(*clean_res.get(1).unwrap()),conv_shock(*clean_res.get(2).unwrap()), conv_shock(*clean_res.get(3).unwrap())], unit: "in",
             time},
-                    PublishableMessage { topic: "TPU/DAQ/StteringAngle".to_string(), data: vec![ *clean_res.get(4).unwrap()], unit: "deg", time }
+                    PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(4).unwrap())], unit: "deg", time }
             ]
 
             }
@@ -72,4 +92,12 @@ pub async fn collect_daq(
             }
         }
     }
+}
+
+fn conv_shock(val: u64) -> f32 {
+    (val as f32 / 4095.0) * 54.44 * (1.0 / 25.4)
+}
+
+fn conv_wheel(val: u64) -> f32 {
+    val as f32 / 4095.0
 }

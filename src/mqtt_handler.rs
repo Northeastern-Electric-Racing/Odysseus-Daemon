@@ -129,9 +129,7 @@ impl MqttProcessor {
             if let Err(err) =
                 std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), time))
             {
-                panic!(
-                    "Could not create folder for data, bailing out of this loop! {err}"
-                );
+                panic!("Could not create folder for data, bailing out of this loop! {err}");
             }
             self.hv_stat_send
                 .send(HVTransition::TransitionOn(crate::HVOnData {
