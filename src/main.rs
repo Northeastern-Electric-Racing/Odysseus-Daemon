@@ -89,6 +89,15 @@ struct VisualArgs {
     /// The output folder of data (videos, audio, text logs, etc), no trailing slash
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
+
+    /// The SocketCAN interface port
+    #[arg(
+        short = 'c',
+        long,
+        env = "CALYPSO_SOCKETCAN_IFACE",
+        default_value = "vcan0"
+    )]
+    socketcan_iface: String,
 }
 
 /// Folder hierarchy
