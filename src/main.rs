@@ -208,7 +208,7 @@ async fn main() {
             token.clone(),
             cli.daq_device.expect("Require daq device"),
             mqtt_sender_tx.clone(),
-            can_handler_tx.clone()
+            can_handler_tx
         ));
     }
 
@@ -246,7 +246,7 @@ async fn main() {
         task_tracker.spawn(sys_parser(
             token.clone(),
             mqtt_sys_rx.unwrap(),
-            mqtt_sender_tx.clone(),
+            mqtt_sender_tx,
         ));
     }
 
