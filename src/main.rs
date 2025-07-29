@@ -5,16 +5,7 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
-    audible::audible_manager,
-    daq::collect_daq,
-    lockdown::lockdown_runner,
-    logger::logger_manager,
-    mqtt_handler::{MqttProcessor, MqttProcessorOptions},
-    numerical::collect_data,
-    playback_data,
-    sys_parser::sys_parser,
-    visual::{run_save_pipeline, SavePipelineOpts},
-    HVTransition, PublishableMessage, SAVE_LOCATION,
+    audible::audible_manager, can_handler::can_handler, daq::collect_daq, lockdown::lockdown_runner, logger::logger_manager, mqtt_handler::{MqttProcessor, MqttProcessorOptions}, numerical::collect_data, playback_data, sys_parser::sys_parser, visual::{run_save_pipeline, SavePipelineOpts}, HVTransition, PublishableMessage, SAVE_LOCATION
 };
 use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
 use tokio::{
@@ -24,6 +15,8 @@ use tokio::{
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+
+use socketcan::CanFrame;
 
 /// ody-visual command line arguments
 #[derive(Parser, Debug)]
@@ -90,6 +83,10 @@ struct VisualArgs {
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
 
+    /// enable can_handler module
+    #[arg(long, env = "ODYSSEUS_DAEMON_CAN_ENABLE")]
+    can_handler: bool,
+
     /// The SocketCAN interface port
     #[arg(
         short = 'c',
@@ -143,6 +140,8 @@ async fn main() {
     } else {
         (None, None)
     };
+
+    let (can_handler_tx, can_handler_rx) = mpsc::channel::<CanFrame>(1000);
 
     let (hv_stat_send, hv_stat_recv) = watch::channel(HVTransition::TransitionOff);
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
@@ -209,7 +208,15 @@ async fn main() {
             token.clone(),
             cli.daq_device.expect("Require daq device"),
             mqtt_sender_tx.clone(),
+            can_handler_tx.clone()
         ));
+    }
+
+    if cli.can_handler {
+        info!("Enable CAN handler");
+        task_tracker.spawn(can_handler(token.clone(), 
+        cli.socketcan_iface,
+        can_handler_rx));
     }
 
     if cli.lockdown {
@@ -239,7 +246,7 @@ async fn main() {
         task_tracker.spawn(sys_parser(
             token.clone(),
             mqtt_sys_rx.unwrap(),
-            mqtt_sender_tx,
+            mqtt_sender_tx.clone(),
         ));
     }
 

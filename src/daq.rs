@@ -8,12 +8,17 @@ use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
+use socketcan::{CanFrame, StandardId, EmbeddedFrame};
+
 use crate::PublishableMessage;
+
+const CAN_ID: u16 = 0x630;
 
 pub async fn collect_daq(
     cancel_token: CancellationToken,
     device: String,
     mqtt_sender_tx: Sender<PublishableMessage>,
+    can_handler_tx: Sender<CanFrame>,
 ) {
     let _ = mqtt_sender_tx;
 
@@ -26,7 +31,7 @@ pub async fn collect_daq(
     let mut buf = String::with_capacity(40);
 
     loop {
-        let msgs = tokio::select! {
+        let (mqtt_msgs, can_msgs) = tokio::select! {
             _ = cancel_token.cancelled() => {
                 debug!("Shutting down MQTT processor!");
                 break;
@@ -69,26 +74,31 @@ pub async fn collect_daq(
                 for item in res {
                     match item.parse::<u64>() {
                         // the inches conversion
-                        Ok(val) => clean_res.push(val ),
+                        Ok(val) => clean_res.push(val),
                         Err(e) => warn!("Invalid byte from DAQ: {}", e),
                     }
                 }
 
-
-                vec![PublishableMessage {
+                (vec![PublishableMessage {
                     topic:"TPU/DAQ/Shockpots".to_string(),
                 data:vec![conv_shock(*clean_res.first().unwrap()),
                 conv_shock(*clean_res.get(1).unwrap()),conv_shock(*clean_res.get(2).unwrap()), conv_shock(*clean_res.get(3).unwrap())], unit: "in",
             time},
                     PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(4).unwrap())], unit: "deg", time }
-            ]
-
-            }
+            ], vec![CanFrame::new(StandardId::new(CAN_ID).expect("Failed to create standard id!"),
+                &(conv_wheel(*clean_res.get(4).unwrap()) as u64).to_ne_bytes()).expect("Failed to create CAN frame!")])
+            } // NOTE: CAN Frame currently only sends wheel sensor data
         };
 
-        for msg in msgs {
-            if let Err(err) = mqtt_sender_tx.send(msg).await {
+        for mqtt in mqtt_msgs {
+            if let Err(err) = mqtt_sender_tx.send(mqtt).await {
                 warn!("Could not pub to sender from daq: {}", err);
+            }
+        }
+
+        for can_frame in can_msgs {
+            if let Err(err) = can_handler_tx.send(can_frame).await {
+                warn!("Could not pub to can senser from daq {}", err);
             }
         }
     }
