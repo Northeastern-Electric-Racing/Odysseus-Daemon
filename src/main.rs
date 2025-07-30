@@ -83,10 +83,6 @@ struct VisualArgs {
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
 
-    /// enable can_handler module
-    #[arg(long, env = "ODYSSEUS_DAEMON_CAN_ENABLE")]
-    can_handler: bool,
-
     /// The SocketCAN interface port
     #[arg(
         short = 'c',
@@ -212,12 +208,11 @@ async fn main() {
         ));
     }
 
-    if cli.can_handler {
-        info!("Enable CAN handler");
-        task_tracker.spawn(can_handler(token.clone(), 
-        cli.socketcan_iface,
-        can_handler_rx));
-    }
+    info!("Enable CAN handler");
+    task_tracker.spawn(can_handler(token.clone(), 
+    cli.socketcan_iface,
+    can_handler_rx));
+
 
     if cli.lockdown {
         info!("Running lockdown module");
