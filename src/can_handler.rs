@@ -10,7 +10,7 @@ pub async fn can_handler(
     mut can_recv: Receiver<CanFrame>
 ) {
     let socket = CanSocket::open(&can_interface).expect("Failed to open CAN socket");
-    // how do we get the CAN id?
+    
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
@@ -18,10 +18,12 @@ pub async fn can_handler(
                     break;
                 },
             Some(frame) = can_recv.recv() => {
+                /* 
                 match socket.write_frame(frame).await {
                     Ok(_) => (),
                     Err(r) => warn!("Could not send CAN frame: {}", r),
                 }
+                */
             }
         }
     }
