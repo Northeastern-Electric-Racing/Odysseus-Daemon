@@ -86,7 +86,7 @@ pub async fn collect_daq(
             time},
                     PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(4).unwrap())], unit: "deg", time }
             ], vec![CanFrame::new(StandardId::new(CAN_ID).expect("Failed to create standard id!"),
-                &(conv_wheel(*clean_res.get(4).unwrap()) as u64).to_ne_bytes()).expect("Failed to create CAN frame!")])
+                &(conv_wheel(*clean_res.get(4).unwrap())).to_be_bytes()).expect("Failed to create CAN frame!")])
             } // NOTE: CAN Frame currently only sends wheel sensor data
         };
 
