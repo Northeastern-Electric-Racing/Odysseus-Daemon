@@ -18,12 +18,10 @@ pub async fn can_handler(
                     break;
                 },
             Some(frame) = can_recv.recv() => {
-                /* 
                 match socket.write_frame(frame).await {
                     Ok(_) => (),
                     Err(r) => warn!("Could not send CAN frame: {}", r),
                 }
-                */
             }
         }
     }
