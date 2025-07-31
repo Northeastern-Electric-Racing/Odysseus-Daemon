@@ -5,7 +5,17 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
-    audible::audible_manager, can_handler::can_handler, daq::collect_daq, lockdown::lockdown_runner, logger::logger_manager, mqtt_handler::{MqttProcessor, MqttProcessorOptions}, numerical::collect_data, playback_data, sys_parser::sys_parser, visual::{run_save_pipeline, SavePipelineOpts}, HVTransition, PublishableMessage, SAVE_LOCATION
+    audible::audible_manager,
+    can_handler::can_handler,
+    daq::collect_daq,
+    lockdown::lockdown_runner,
+    logger::logger_manager,
+    mqtt_handler::{MqttProcessor, MqttProcessorOptions},
+    numerical::collect_data,
+    playback_data,
+    sys_parser::sys_parser,
+    visual::{run_save_pipeline, SavePipelineOpts},
+    HVTransition, PublishableMessage, SAVE_LOCATION,
 };
 use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
 use tokio::{
@@ -84,12 +94,7 @@ struct VisualArgs {
     output_folder: String,
 
     /// The SocketCAN interface port
-    #[arg(
-        short = 'c',
-        long,
-        env = "CALYPSO_SOCKETCAN_IFACE",
-        default_value = "vcan0"
-    )]
+    #[arg(short = 'c', long, env = "SOCKETCAN_IFACE", default_value = "can0")]
     socketcan_iface: String,
 }
 
@@ -182,6 +187,13 @@ async fn main() {
 
     // TASK SPAWNING
 
+    info!("Enable CAN handler");
+    task_tracker.spawn(can_handler(
+        token.clone(),
+        cli.socketcan_iface,
+        can_handler_rx,
+    ));
+
     if cli.video {
         info!("Running video module");
         task_tracker.spawn(run_save_pipeline(
@@ -204,15 +216,9 @@ async fn main() {
             token.clone(),
             cli.daq_device.expect("Require daq device"),
             mqtt_sender_tx.clone(),
-            can_handler_tx
+            can_handler_tx,
         ));
     }
-
-    info!("Enable CAN handler");
-    task_tracker.spawn(can_handler(token.clone(), 
-    cli.socketcan_iface,
-    can_handler_rx));
-
 
     if cli.lockdown {
         info!("Running lockdown module");

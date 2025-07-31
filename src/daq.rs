@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
-use socketcan::{CanFrame, StandardId, EmbeddedFrame};
+use socketcan::{CanFrame, EmbeddedFrame, StandardId};
 
 use crate::PublishableMessage;
 
@@ -87,7 +87,7 @@ pub async fn collect_daq(
                     PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(4).unwrap())], unit: "deg", time }
             ], vec![CanFrame::new(StandardId::new(CAN_ID).expect("Failed to create standard id!"),
                 &(conv_wheel(*clean_res.get(4).unwrap())).to_be_bytes()).expect("Failed to create CAN frame!")])
-            } // NOTE: CAN Frame currently only sends wheel sensor data
+            } // NOTE: CAN Frame currently only sends wheel sensor data in big endian
         };
 
         for mqtt in mqtt_msgs {

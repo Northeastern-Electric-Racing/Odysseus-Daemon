@@ -3,13 +3,13 @@ pub mod uploader;
 
 // MODULES
 pub mod audible;
+pub mod can_handler;
 pub mod daq;
 pub mod lockdown;
 pub mod logger;
 pub mod numerical;
 pub mod sys_parser;
 pub mod visual;
-pub mod can_handler;
 
 // PROTOBUF
 pub mod playback_data;

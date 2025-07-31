@@ -5,12 +5,12 @@ use tracing::{debug, warn};
 use socketcan::{tokio::CanSocket, CanFrame};
 
 pub async fn can_handler(
-    cancel_token: CancellationToken, 
+    cancel_token: CancellationToken,
     can_interface: String,
-    mut can_recv: Receiver<CanFrame>
+    mut can_recv: Receiver<CanFrame>,
 ) {
     let socket = CanSocket::open(&can_interface).expect("Failed to open CAN socket");
-    
+
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
@@ -23,6 +23,6 @@ pub async fn can_handler(
                     Err(r) => warn!("Could not send CAN frame: {}", r),
                 }
             }
-        }   
+        }
     }
 }
