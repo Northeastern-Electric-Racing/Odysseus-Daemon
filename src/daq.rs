@@ -109,5 +109,5 @@ fn conv_shock(val: u64) -> f32 {
 }
 
 fn conv_wheel(val: u64) -> f32 {
-    ((val as f32 / 4095.0) * 3.3 - 0.946) / 32.0
+    ((val as f32 / 4095.0) * 3.3 - 0.946) * 32.0
 }
