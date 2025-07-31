@@ -23,6 +23,6 @@ pub async fn can_handler(
                     Err(r) => warn!("Could not send CAN frame: {}", r),
                 }
             }
-        }
+        }   
     }
 }
