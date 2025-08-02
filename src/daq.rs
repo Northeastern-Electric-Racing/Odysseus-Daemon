@@ -1,10 +1,10 @@
-use std::{
-    io::{BufRead, BufReader},
-    time::{Duration, UNIX_EPOCH},
-};
+use std::time::{Duration, UNIX_EPOCH};
 
-use serialport::TTYPort;
-use tokio::sync::mpsc::Sender;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    sync::mpsc::Sender,
+};
+use tokio_serial::{SerialPortBuilderExt, SerialStream};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, trace, warn};
 
@@ -22,12 +22,12 @@ pub async fn collect_daq(
 ) {
     let _ = mqtt_sender_tx;
 
-    let port = serialport::new(device, 115_200)
-        .open_native()
+    let port = tokio_serial::new(device, 115_200)
+        .open_native_async()
         .expect("Failed to open port");
 
     let mut reader_time = tokio::time::interval(Duration::from_millis(1));
-    let mut reader = BufReader::<TTYPort>::new(port);
+    let mut reader = BufReader::<SerialStream>::new(port);
     let mut buf = String::with_capacity(40);
 
     loop {
@@ -39,7 +39,8 @@ pub async fn collect_daq(
             _ = reader_time.tick() => {
                 buf.clear();
                 // first go until $
-                match reader.skip_until(0x24) {
+                let mut veca = vec![];
+                match reader.read_until(0x24, &mut veca).await {
                     Ok(res) => {
                         trace!("Read {} garbage bytes from DAQ", res);
                     },
@@ -50,7 +51,7 @@ pub async fn collect_daq(
                 }
                 // then busy poll until we get the full data, with rl lockout
                 let time: u64 = loop {
-                     match reader.read_line(&mut buf) {
+                     match reader.read_line(&mut buf).await {
                         Ok(res) => {
                             trace!("Read {} bytes from DAQ", res);
                             break UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
