@@ -1,4 +1,4 @@
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -6,7 +6,7 @@ use tokio::{
 };
 use tokio_serial::{SerialPortBuilderExt, SerialStream};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 
 use socketcan::{CanFrame, EmbeddedFrame, StandardId};
 
@@ -26,9 +26,11 @@ pub async fn collect_daq(
         .open_native_async()
         .expect("Failed to open port");
 
-    let mut reader_time = tokio::time::interval(Duration::from_millis(4));
-    let mut reader = BufReader::<SerialStream>::new(port);
-    let mut buf = String::with_capacity(40);
+    //let mut reader_time = tokio::time::interval(Duration::from_millis(4));
+    let reader = BufReader::<SerialStream>::new(port);
+    //let mut buf = String::with_capacity(40);
+
+    let mut lines = reader.lines();
 
     loop {
         let (mqtt_msgs, can_msgs) = tokio::select! {
@@ -36,33 +38,31 @@ pub async fn collect_daq(
                 debug!("Shutting down MQTT processor!");
                 break;
             },
-            _ = reader_time.tick() => {
-                buf.clear();
+            line = lines.next_line() => {
                 // first go until $
-                let time: u64 = match tokio::time::timeout(Duration::from_millis(50), reader.read_line(&mut buf)).await {
+                let time = UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
+                let line: String = match line {
                     Ok(res) => {
                         match res {
-                                Ok(res) => {
-                                trace!("Read {} garbage bytes from DAQ", res);
-                                UNIX_EPOCH.elapsed().unwrap().as_micros() as u64
+                                Some(res) => {
+                                res
                             },
-                            Err(e) =>  {
-                            debug!("Failed to read DAQ buffer: {}", e);
+                            None =>  {
+                            debug!("Failed to read DAQ buffer no line");
                             continue;
                             }
                         }
                     },
                     Err(error) =>  {
-                        debug!("Failed to read DAQ buffer timeout: {}", error);
+                        debug!("Failed to read DAQ buffer: {}", error);
                         continue;
                     }
                 };
-                
-                buf.pop(); // get rid of newline
+
                 // split up the points
-                let res: Vec<_> = buf.split('$').last().unwrap_or("").split(',').collect();
+                let res: Vec<_> = line.split('$').next_back().unwrap_or("").split(',').collect();
                 if res.len() < 10 {
-                    warn!("Under found samples: {}", buf);
+                    warn!("Under found samples: {}", line);
                     continue;
                 }
 
