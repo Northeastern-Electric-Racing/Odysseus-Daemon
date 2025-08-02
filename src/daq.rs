@@ -26,7 +26,7 @@ pub async fn collect_daq(
         .open_native_async()
         .expect("Failed to open port");
 
-    let mut reader_time = tokio::time::interval(Duration::from_millis(1));
+    let mut reader_time = tokio::time::interval(Duration::from_millis(4));
     let mut reader = BufReader::<SerialStream>::new(port);
     let mut buf = String::with_capacity(40);
 
@@ -39,48 +39,28 @@ pub async fn collect_daq(
             _ = reader_time.tick() => {
                 buf.clear();
                 // first go until $
-                let mut veca = vec![];
-                match tokio::time::timeout(Duration::from_millis(50), reader.read_until(0x24, &mut veca)).await {
+                let time: u64 = match tokio::time::timeout(Duration::from_millis(50), reader.read_line(&mut buf)).await {
                     Ok(res) => {
                         match res {
-                            Ok(res) => {
-                        trace!("Read {} garbage bytes from DAQ", res);
-                    },
-                    Err(_) =>  {
-                        //trace!("Failed to read DAQ buffer: {}", e);
-                        continue;
-                     }
+                                Ok(res) => {
+                                trace!("Read {} garbage bytes from DAQ", res);
+                                UNIX_EPOCH.elapsed().unwrap().as_micros() as u64
+                            },
+                            Err(e) =>  {
+                            debug!("Failed to read DAQ buffer: {}", e);
+                            continue;
+                            }
                         }
                     },
                     Err(error) =>  {
-                        trace!("Failed to read DAQ buffer timeout: {}", error);
+                        debug!("Failed to read DAQ buffer timeout: {}", error);
                         continue;
-                     }
-                }
-                // then busy poll until we get the full data, with rl lockout
-                let time: u64 = loop {
-                     match tokio::time::timeout(Duration::from_millis(100), reader.read_line(&mut buf)).await {
-                        Ok(res) => {
-                            match res {
-                                Ok(res) => {
-                            trace!("Read {} bytes from DAQ", res);
-                            break UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
-                         },
-                         Err(_) =>  {
-                             //trace!("Failed to read DAQ buffer: {}", e);
-                             continue;
-                          }
-                            };
-                         },
-                         Err(_) =>  {
-                             //trace!("Failed to read DAQ buffer: {}", e);
-                             continue;
-                          }
-                     };
+                    }
                 };
+                
                 buf.pop(); // get rid of newline
                 // split up the points
-                let res: Vec<_> = buf.split(',').collect();
+                let res: Vec<_> = buf.split('$').last().unwrap_or("").split(',').collect();
                 if res.len() < 10 {
                     warn!("Under found samples: {}", buf);
                     continue;
