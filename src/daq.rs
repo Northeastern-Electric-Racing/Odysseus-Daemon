@@ -40,21 +40,37 @@ pub async fn collect_daq(
                 buf.clear();
                 // first go until $
                 let mut veca = vec![];
-                match reader.read_until(0x24, &mut veca).await {
+                match tokio::time::timeout(Duration::from_millis(50), reader.read_until(0x24, &mut veca)).await {
                     Ok(res) => {
+                        match res {
+                            Ok(res) => {
                         trace!("Read {} garbage bytes from DAQ", res);
                     },
                     Err(_) =>  {
                         //trace!("Failed to read DAQ buffer: {}", e);
                         continue;
                      }
+                        }
+                    },
+                    Err(error) =>  {
+                        trace!("Failed to read DAQ buffer timeout: {}", error);
+                        continue;
+                     }
                 }
                 // then busy poll until we get the full data, with rl lockout
                 let time: u64 = loop {
-                     match reader.read_line(&mut buf).await {
+                     match tokio::time::timeout(Duration::from_millis(100), reader.read_line(&mut buf)).await {
                         Ok(res) => {
+                            match res {
+                                Ok(res) => {
                             trace!("Read {} bytes from DAQ", res);
                             break UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
+                         },
+                         Err(_) =>  {
+                             //trace!("Failed to read DAQ buffer: {}", e);
+                             continue;
+                          }
+                            };
                          },
                          Err(_) =>  {
                              //trace!("Failed to read DAQ buffer: {}", e);
