@@ -26,7 +26,7 @@ pub async fn collect_daq(
         .open_native_async()
         .expect("Failed to open port");
 
-    let mut reader_time = tokio::time::interval(Duration::from_millis(4));
+    //let mut reader_time = tokio::time::interval(Duration::from_millis(4));
     let reader = BufReader::<SerialStream>::new(port);
     //let mut buf = String::with_capacity(40);
 
