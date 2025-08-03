@@ -3,7 +3,7 @@ use socketcan::CanFrame;
 use tokio::sync::mpsc::{Sender};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tokio::time::interval;
-use tracing::{debug};
+use tracing::{warn, debug};
 
 use crate::{daq::collect_daq};
 use crate::PublishableMessage;
@@ -12,18 +12,18 @@ use std::{sync::atomic::{AtomicBool, Ordering}, time::Duration};
 
 pub async fn monitor_daq(
     cancel_token: CancellationToken,
-    daq_cancel_token: CancellationToken,
     device: String,
     mqtt_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>) 
 {  
 
-    let mut timeout = interval(Duration::from_millis(5000));
+    let mut timeout = interval(Duration::from_millis(1000));
 
     let watchdog = AtomicBool::new(false);
-    let task_manager = TaskTracker::new();
+    let task_manager = TaskTracker::new();  
 
     let (daq_monitor_tx, mut daq_monitor_rx) = tokio::sync::mpsc::channel::<bool>(1000);
+    let daq_cancel_token = CancellationToken::new();
 
     loop {
         tokio::select! {
@@ -37,6 +37,7 @@ pub async fn monitor_daq(
                 if !watchdog.load(Ordering::Relaxed) {
                     daq_cancel_token.cancel();
                     task_manager.spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
+                    warn!("Respawing DAQ thread");
                 } 
                 watchdog.store(false, Ordering::Relaxed);
             }

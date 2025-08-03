@@ -202,7 +202,7 @@ async fn main() {
     }
     if cli.daq {
         info!("Running DAQ data collector");
-        task_tracker.spawn(monitor_daq(token.clone(), token.clone(), cli.daq_device.expect("failed to init daq device"), mqtt_sender_tx.clone(), can_handler_tx)
+        task_tracker.spawn(monitor_daq(token.clone(), cli.daq_device.expect("failed to init daq device"), mqtt_sender_tx.clone(), can_handler_tx)
         );
     }
 
