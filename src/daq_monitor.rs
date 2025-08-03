@@ -19,7 +19,7 @@ pub async fn monitor_daq(
     mqtt_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>,
 ) {
-    let mut timeout = interval(Duration::from_millis(1000));
+    let mut timeout = interval(Duration::from_millis(200));
 
     let mut watchdog = false;
 
