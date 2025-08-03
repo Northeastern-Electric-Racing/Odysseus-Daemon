@@ -5,7 +5,17 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
-    audible::audible_manager, can_handler::can_handler, daq_monitor::monitor_daq, lockdown::lockdown_runner, logger::logger_manager, mqtt_handler::{MqttProcessor, MqttProcessorOptions}, numerical::collect_data, playback_data, sys_parser::sys_parser, visual::{run_save_pipeline, SavePipelineOpts}, HVTransition, PublishableMessage, SAVE_LOCATION
+    audible::audible_manager,
+    can_handler::can_handler,
+    daq_monitor::monitor_daq,
+    lockdown::lockdown_runner,
+    logger::logger_manager,
+    mqtt_handler::{MqttProcessor, MqttProcessorOptions},
+    numerical::collect_data,
+    playback_data,
+    sys_parser::sys_parser,
+    visual::{run_save_pipeline, SavePipelineOpts},
+    HVTransition, PublishableMessage, SAVE_LOCATION,
 };
 use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
 use tokio::{
@@ -202,8 +212,12 @@ async fn main() {
     }
     if cli.daq {
         info!("Running DAQ data collector");
-        task_tracker.spawn(monitor_daq(token.clone(), cli.daq_device.expect("failed to init daq device"), mqtt_sender_tx.clone(), can_handler_tx)
-        );
+        task_tracker.spawn(monitor_daq(
+            token.clone(),
+            cli.daq_device.expect("failed to init daq device"),
+            mqtt_sender_tx.clone(),
+            can_handler_tx,
+        ));
     }
 
     if cli.lockdown {
