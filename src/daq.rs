@@ -88,10 +88,12 @@ pub async fn collect_daq(
             } // NOTE: CAN Frame currently only sends wheel sensor data in big endian
         };
 
-        for mqtt in mqtt_msgs {
+        if mqtt_msgs.len() > 0 {
             if let Err(err) = daq_monitor_tx.send(true).await {
                 warn!("Failed to send to daq watchdog: {}", err);
             };
+        }
+        for mqtt in mqtt_msgs {
             if let Err(err) = mqtt_sender_tx.send(mqtt).await {
                 warn!("Could not pub to sender from daq: {}", err);
             }
