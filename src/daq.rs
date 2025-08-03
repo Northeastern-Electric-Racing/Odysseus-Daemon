@@ -81,7 +81,7 @@ pub async fn collect_daq(
                 data:vec![conv_shock(*clean_res.get(1).unwrap()),
                 conv_shock(*clean_res.get(2).unwrap()),conv_shock(*clean_res.get(3).unwrap()), conv_shock(*clean_res.get(7).unwrap())], unit: "in",
             time},
-                    PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(4).unwrap())], unit: "V", time }
+                    PublishableMessage { topic: "TPU/DAQ/SteringAngle".to_string(), data: vec![ conv_wheel(*clean_res.get(6).unwrap())], unit: "V", time }
             ], vec![CanFrame::new(StandardId::new(CAN_ID).expect("Failed to create standard id!"),
                 &(conv_wheel(*clean_res.get(6).unwrap())).to_be_bytes()).expect("Failed to create CAN frame!")])
             } // NOTE: CAN Frame currently only sends wheel sensor data in big endian
