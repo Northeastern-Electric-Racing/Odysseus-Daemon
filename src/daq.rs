@@ -1,4 +1,4 @@
-use std::time::UNIX_EPOCH;
+use std::{sync::atomic::{AtomicBool, Ordering}, time::{Duration, UNIX_EPOCH}};
 
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -22,22 +22,37 @@ pub async fn collect_daq(
 ) {
     let _ = mqtt_sender_tx;
 
-    let port = tokio_serial::new(device, 115_200)
+    let mut port = tokio_serial::new(&device, 115_200)
         .open_native_async()
         .expect("Failed to open port");
 
-    //let mut reader_time = tokio::time::interval(Duration::from_millis(4));
-    let reader = BufReader::<SerialStream>::new(port);
+    let mut reader_time = tokio::time::interval(Duration::from_millis(1000));
+    let mut reader = BufReader::<SerialStream>::new(port);
     //let mut buf = String::with_capacity(40);
 
     let mut lines = reader.lines();
+    let retry = AtomicBool::new(false);
 
     loop {
+        
         let (mqtt_msgs, can_msgs) = tokio::select! {
             _ = cancel_token.cancelled() => {
                 debug!("Shutting down MQTT processor!");
                 break;
             },
+
+            _ = reader_time.tick() => { 
+                if retry.load(Ordering::Relaxed) {
+                    port = tokio_serial::new(&device, 115_200)
+                        .open_native_async()
+                        .expect("Failed to open port");
+                    reader = BufReader::<SerialStream>::new(port);
+                    lines = reader.lines();
+                    retry.store(false, Ordering::Relaxed);
+                }
+                continue;
+            }
+
             line = lines.next_line() => {
                 // first go until $
                 let time = UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
@@ -49,6 +64,7 @@ pub async fn collect_daq(
                             },
                             None =>  {
                             debug!("Failed to read DAQ buffer no line");
+                            retry.store(true, Ordering::Relaxed);
                             continue;
                             }
                         }
