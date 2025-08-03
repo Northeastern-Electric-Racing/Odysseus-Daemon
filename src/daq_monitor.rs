@@ -35,7 +35,7 @@ pub async fn monitor_daq(
     ));
 
     loop {
-        tokio::select! {
+        let respawn: bool = tokio::select! {
             _ = cancel_token.cancelled() => {
                 daq_cancel_token.cancel();
                 task.await;
@@ -45,17 +45,23 @@ pub async fn monitor_daq(
 
             _ = timeout.tick() => {
                 if !watchdog {
-                    daq_cancel_token.cancel();
-                    task.await;
-                    task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
-                    warn!("Respawing DAQ thread");
-                }
-                watchdog = false;
+                    watchdog = false;
+                    true
+                } else {
+                    false
+                }            
             }
-
             _ = daq_monitor_rx.recv() => {
                 watchdog = true;
+                false
             }
+        };
+
+        if respawn {
+            daq_cancel_token.cancel();
+            task.await;
+            task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
+            warn!("Respawing DAQ thread");
         }
     }
 }
