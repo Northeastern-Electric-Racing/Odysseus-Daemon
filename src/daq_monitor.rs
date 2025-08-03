@@ -24,7 +24,7 @@ pub async fn monitor_daq(
     let mut watchdog = false;
 
     let (daq_monitor_tx, mut daq_monitor_rx) = tokio::sync::mpsc::channel::<bool>(1000);
-    let daq_cancel_token = CancellationToken::new();
+    let mut daq_cancel_token = CancellationToken::new();
 
     let mut task: JoinHandle<()> = tokio::task::spawn(collect_daq(
         daq_cancel_token.clone(),
@@ -35,7 +35,7 @@ pub async fn monitor_daq(
     ));
 
     loop {
-        let respawn: bool = tokio::select! {
+        tokio::select! {
             _ = cancel_token.cancelled() => {
                 daq_cancel_token.cancel();
                 task.await;
@@ -45,23 +45,18 @@ pub async fn monitor_daq(
 
             _ = timeout.tick() => {
                 if !watchdog {
-                    watchdog = false;
-                    true
-                } else {
-                    false
-                }            
+                    daq_cancel_token.cancel();
+                    task.await;
+                    daq_cancel_token = CancellationToken::new();
+                    task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
+                    warn!("Respawing DAQ thread");
+                }
+                watchdog = false;
             }
+
             _ = daq_monitor_rx.recv() => {
                 watchdog = true;
-                false
             }
-        };
-
-        if respawn {
-            daq_cancel_token.cancel();
-            task.await;
-            task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
-            warn!("Respawing DAQ thread");
         }
     }
 }
