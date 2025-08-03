@@ -17,6 +17,7 @@ const CAN_ID: u16 = 0x630;
 pub async fn collect_daq(
     cancel_token: CancellationToken,
     device: String,
+    daq_monitor_tx: Sender<bool>,
     mqtt_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>,
 ) {
@@ -88,6 +89,9 @@ pub async fn collect_daq(
         };
 
         for mqtt in mqtt_msgs {
+            if let Err(err) = daq_monitor_tx.send(true).await {
+                warn!("Failed to send to daq watchdog: {}", err);
+            };
             if let Err(err) = mqtt_sender_tx.send(mqtt).await {
                 warn!("Could not pub to sender from daq: {}", err);
             }

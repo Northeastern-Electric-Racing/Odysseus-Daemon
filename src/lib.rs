@@ -5,6 +5,7 @@ pub mod uploader;
 pub mod audible;
 pub mod can_handler;
 pub mod daq;
+pub mod daq_monitor;
 pub mod lockdown;
 pub mod logger;
 pub mod numerical;
