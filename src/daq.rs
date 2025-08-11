@@ -40,8 +40,8 @@ pub async fn collect_daq(
                 debug!("Shutting down DAQ process: cancel called");
                 break;
             },
-            _ = tokio::time::sleep(Duration::from_secs(1)) => {
-                warn!("Shutting down DAQ process: 1 second has passed without line");
+            _ = tokio::time::sleep(Duration::from_millis(150)) => {
+                warn!("Shutting down DAQ process: 150ms has passed without line");
                 break;
             },
             line = lines.next_line() => {
