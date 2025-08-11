@@ -46,7 +46,12 @@ pub async fn monitor_daq(
             _ = timeout.tick() => {
                 if !watchdog {
                     daq_cancel_token.cancel();
-                    task.await;
+                    match tokio::time::timeout(Duration::from_secs(1), task).await {
+                        Ok(_) => (),
+                        Err(_) => {
+                            warn!("Could not cancel the DAQ task!");
+                        },
+                    }
                     daq_cancel_token = CancellationToken::new();
                     task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
                     warn!("Respawing DAQ thread");
