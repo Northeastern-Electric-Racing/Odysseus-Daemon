@@ -1,4 +1,4 @@
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -33,10 +33,15 @@ pub async fn collect_daq(
 
     let mut lines = reader.lines();
 
+
     loop {
         let (mqtt_msgs, can_msgs) = tokio::select! {
             _ = cancel_token.cancelled() => {
-                debug!("Shutting down MQTT processor!");
+                debug!("Shutting down DAQ process: cancel called");
+                break;
+            },
+            _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                warn!("Shutting down DAQ process: 1 second has passed without line");
                 break;
             },
             line = lines.next_line() => {
