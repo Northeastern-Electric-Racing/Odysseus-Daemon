@@ -98,13 +98,19 @@ pub async fn collect_daq(
             };
         }
         for mqtt in mqtt_msgs {
-            if let Err(err) = mqtt_sender_tx.send_timeout(mqtt, Duration::from_millis(50)).await {
+            if let Err(err) = mqtt_sender_tx
+                .send_timeout(mqtt, Duration::from_millis(50))
+                .await
+            {
                 warn!("Could not pub to sender from daq: {}", err);
             }
         }
 
         for can_frame in can_msgs {
-            if let Err(err) = can_handler_tx.send_timeout(can_frame, Duration::from_millis(50)).await {
+            if let Err(err) = can_handler_tx
+                .send_timeout(can_frame, Duration::from_millis(50))
+                .await
+            {
                 warn!("Could not pub to can senser from daq {}", err);
             }
         }

@@ -8,10 +8,7 @@ use tracing::{debug, warn};
 use crate::daq::collect_daq;
 use crate::PublishableMessage;
 
-use std::{
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
-};
+use std::time::Duration;
 
 pub async fn monitor_daq(
     cancel_token: CancellationToken,
