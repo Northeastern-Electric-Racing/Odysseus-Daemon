@@ -6,6 +6,8 @@ use std::{
 use clap::Parser;
 use odysseus_daemon::{
     audible::audible_manager,
+    can_handler::can_handler,
+    daq_monitor::monitor_daq,
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
@@ -23,6 +25,8 @@ use tokio::{
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+
+use socketcan::CanFrame;
 
 /// ody-visual command line arguments
 #[derive(Parser, Debug)]
@@ -47,6 +51,14 @@ struct VisualArgs {
     /// Enable data module
     #[arg(short = 'd', long, env = "ODYSSEUS_DAEMON_DATA_ENABLE")]
     data: bool,
+
+    /// Enable daq module
+    #[arg(long, env = "ODYSSEUS_DAEMON_DAQ_ENABLE")]
+    daq: bool,
+
+    /// Daq USB device
+    #[arg(long, env = "ODYSSEUS_DAEMON_DAQ_DEVICE")]
+    daq_device: Option<String>,
 
     /// Enable logger
     #[arg(long, env = "ODYSSEUS_DAEMON_LOGGER_ENABLE")]
@@ -80,6 +92,10 @@ struct VisualArgs {
     /// The output folder of data (videos, audio, text logs, etc), no trailing slash
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
     output_folder: String,
+
+    /// The SocketCAN interface port
+    #[arg(short = 'c', long, env = "SOCKETCAN_IFACE", default_value = "can0")]
+    socketcan_iface: String,
 }
 
 /// Folder hierarchy
@@ -126,6 +142,8 @@ async fn main() {
         (None, None)
     };
 
+    let (can_handler_tx, can_handler_rx) = mpsc::channel::<CanFrame>(1000);
+
     let (hv_stat_send, hv_stat_recv) = watch::channel(HVTransition::TransitionOff);
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
@@ -169,6 +187,13 @@ async fn main() {
 
     // TASK SPAWNING
 
+    info!("Enable CAN handler");
+    task_tracker.spawn(can_handler(
+        token.clone(),
+        cli.socketcan_iface,
+        can_handler_rx,
+    ));
+
     if cli.video {
         info!("Running video module");
         task_tracker.spawn(run_save_pipeline(
@@ -184,6 +209,15 @@ async fn main() {
     if cli.data {
         info!("Running TPU data collector");
         task_tracker.spawn(collect_data(token.clone(), mqtt_sender_tx.clone()));
+    }
+    if cli.daq {
+        info!("Running DAQ data collector");
+        task_tracker.spawn(monitor_daq(
+            token.clone(),
+            cli.daq_device.expect("failed to init daq device"),
+            mqtt_sender_tx.clone(),
+            can_handler_tx,
+        ));
     }
 
     if cli.lockdown {

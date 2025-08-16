@@ -16,7 +16,7 @@ use tokio::sync::{
     watch::Sender,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::{
     playback_data, serverdata, uploader::upload_files, HVTransition, PublishableMessage,
@@ -105,7 +105,7 @@ impl MqttProcessor {
     /// This handles the reception of mqtt messages, will not return
     /// * `eventloop` - The eventloop returned by ::new to connect to.  The loop isnt sync so this is the best that can be done
     /// * `client` - The async mqttt v5 client to use for subscriptions
-    pub async fn process_mqtt(mut self, client: Arc<AsyncClient>, mut eventloop: EventLoop) {
+    pub async fn process_mqtt(self, client: Arc<AsyncClient>, mut eventloop: EventLoop) {
         debug!("Subscribing to siren, all topics");
         client
             .subscribe("#", rumqttc::v5::mqttbytes::QoS::ExactlyOnce)
@@ -118,7 +118,6 @@ impl MqttProcessor {
                 .await
                 .expect("Could not subscribe to Siren");
         }
-
         // if augment HV on, send as such, otherwise start default off
         let mut last_stat = if self.augment_hv_on {
             let time = SystemTime::now()
@@ -129,10 +128,7 @@ impl MqttProcessor {
             if let Err(err) =
                 std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), time))
             {
-                panic!(
-                    "Could not create folder for data, bailing out of this loop! {}",
-                    err
-                );
+                panic!("Could not create folder for data, bailing out of this loop! {err}");
             }
             self.hv_stat_send
                 .send(HVTransition::TransitionOn(crate::HVOnData {
@@ -143,6 +139,13 @@ impl MqttProcessor {
         } else {
             false
         };
+
+        info!("Spawning MQTT publisher!");
+        tokio::spawn(pub_handle(
+            self.cancel_token.clone(),
+            self.mqtt_sender_rx,
+            client,
+        ));
 
         loop {
             tokio::select! {
@@ -239,16 +242,31 @@ impl MqttProcessor {
                     Err(e) => trace!("Recieved error: {}", e),
                     _ => {}
                 },
-                sendable = self.mqtt_sender_rx.recv() => {
+            }
+        }
+    }
+}
+
+async fn pub_handle(
+    cancel_token: CancellationToken,
+    mut mqtt_sender_rx: Receiver<PublishableMessage>,
+    client: Arc<AsyncClient>,
+) {
+    loop {
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                    debug!("Shutting down MQTT publisher!");
+                    break;
+            },
+
+            sendable = mqtt_sender_rx.recv() => {
                     match sendable {
                         Some(sendable) => {
                             trace!("Sending {:?}", sendable);
                             let mut payload = serverdata::ServerData::new();
                             payload.unit = sendable.unit.to_string();
                             payload.values = sendable.data;
-                            payload.time_us =  SystemTime::now()
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("Time went backwards").as_micros() as u64;
+                            payload.time_us =  sendable.time;
                             let Ok(bytes) = protobuf::Message::write_to_bytes(&payload) else {
                                 warn!("Failed to serialize protobuf message!");
                                 continue;
@@ -261,7 +279,6 @@ impl MqttProcessor {
                         None => continue,
                     }
                 }
-            }
         }
     }
 }
