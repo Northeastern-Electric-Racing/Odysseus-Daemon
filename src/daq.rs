@@ -21,15 +21,11 @@ pub async fn collect_daq(
     mqtt_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>,
 ) {
-    let _ = mqtt_sender_tx;
-
     let port = tokio_serial::new(device, 115_200)
         .open_native_async()
         .expect("Failed to open port");
 
-    //let mut reader_time = tokio::time::interval(Duration::from_millis(4));
     let reader = BufReader::<SerialStream>::new(port);
-    //let mut buf = String::with_capacity(40);
 
     let mut lines = reader.lines();
 
@@ -92,7 +88,7 @@ pub async fn collect_daq(
             } // NOTE: CAN Frame currently only sends wheel sensor data in big endian
         };
 
-        if mqtt_msgs.len() > 0 {
+        if !mqtt_msgs.is_empty() {
             if let Err(err) = daq_monitor_tx.send(true).await {
                 warn!("Failed to send to daq watchdog: {}", err);
             };

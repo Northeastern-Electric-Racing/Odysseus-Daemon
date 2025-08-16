@@ -10,6 +10,10 @@ use crate::PublishableMessage;
 
 use std::time::Duration;
 
+/**
+ * The Jack DAQ is prone to freezing, partially due to MQTT issues, but mostly serial piping
+ * This code is not production quality as Jack DAQ is not to be used at competition
+ */
 pub async fn monitor_daq(
     cancel_token: CancellationToken,
     device: String,
@@ -35,7 +39,7 @@ pub async fn monitor_daq(
         tokio::select! {
             _ = cancel_token.cancelled() => {
                 daq_cancel_token.cancel();
-                task.await;
+                let _ = task.await;
                 debug!("Shutting down daq monitor");
                 break;
             }
