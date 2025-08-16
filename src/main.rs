@@ -8,6 +8,7 @@ use odysseus_daemon::{
     audible::audible_manager,
     can_handler::can_handler,
     daq_monitor::monitor_daq,
+    gps::gps_manager,
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::{MqttProcessor, MqttProcessorOptions},
@@ -94,8 +95,17 @@ struct VisualArgs {
     output_folder: String,
 
     /// The SocketCAN interface port
-    #[arg(short = 'c', long, env = "SOCKETCAN_IFACE", default_value = "can0")]
+    #[arg(
+        short = 'c',
+        long,
+        env = "ODYSSEUS_DAEMON_SOCKETCAN_IFACE",
+        default_value = "vcan0"
+    )]
     socketcan_iface: String,
+
+    /// Whether to enable the GPS module
+    #[arg(long, env = "ODYSSEUS_DAEMON_GPS")]
+    gps: bool,
 }
 
 /// Folder hierarchy
@@ -247,8 +257,13 @@ async fn main() {
         task_tracker.spawn(sys_parser(
             token.clone(),
             mqtt_sys_rx.unwrap(),
-            mqtt_sender_tx,
+            mqtt_sender_tx.clone(),
         ));
+    }
+
+    if cli.gps {
+        info!("Running GPS Manager");
+        task_tracker.spawn(gps_manager(token.clone(), mqtt_sender_tx));
     }
 
     task_tracker.close();

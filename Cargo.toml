@@ -20,8 +20,10 @@ tokio-util = { version = "0.7.15", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["ansi", "env-filter"] }
 regex = "1.11.1"
-#serialport = "4.7.2"
 tokio-serial = "5.4.5"
+gpsd_proto = { git = "https://github.com/c-to-the-l/gpsd_proto.git"}
+futures-util = "0.3.31"
+tokio-stream = "0.1.17"
 
 [build-dependencies]
 protobuf-codegen = "3.7.1"
