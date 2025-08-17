@@ -6,6 +6,7 @@ pub mod audible;
 pub mod can_handler;
 pub mod daq;
 pub mod daq_monitor;
+pub mod gps;
 pub mod lockdown;
 pub mod logger;
 pub mod numerical;

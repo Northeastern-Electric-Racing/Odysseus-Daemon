@@ -56,7 +56,7 @@ pub async fn collect_data(
             },
             // STEP 2: add a block to gather the data and send the message, include topic and unit blocks
             _ = cpu_temp_int.tick() => {
-                const TOPIC: &str = "TPU/OnBoard/CpuTemp";
+                const TOPIC: &str = "TPU/OnBoard2/CpuTemp";
                 const UNIT: &str = "celsius";
 
                 let value = match temperature_component {
@@ -74,10 +74,10 @@ pub async fn collect_data(
 
             }
             _ = cpu_usage_int.tick() => {
-                const TOPIC_C: &str = "TPU/OnBoard/CpuUsage";
+                const TOPIC_C: &str = "TPU/OnBoard2/CpuUsage";
                 const UNIT_C: &str = "%";
 
-                const TOPIC_B: &str = "TPU/OnBoard/BrokerCpuUsage";
+                const TOPIC_B: &str = "TPU/OnBoard2/BrokerCpuUsage";
                 const UNIT_B: &str = "%";
 
 
@@ -96,7 +96,7 @@ pub async fn collect_data(
                 PublishableMessage{ topic: TOPIC_B.to_string(), data: vec![process.cpu_usage()], unit: UNIT_B, time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 }]
             },
             _ = mem_avail_int.tick() => {
-                const TOPIC: &str = "TPU/OnBoard/MemAvailable";
+                const TOPIC: &str = "TPU/OnBoard2/MemAvailable";
                 const UNIT: &str = "MB";
 
                 sys.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
