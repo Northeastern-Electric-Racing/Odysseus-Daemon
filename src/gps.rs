@@ -109,6 +109,34 @@ async fn send_gps_data(
             trace!("Got GPS Gst: {:?}", gst);
             return;
         }
+        UnifiedResponse::Att(att) => {
+            trace!("Got GPS att: {:?}", att);
+            return;
+        }
+        UnifiedResponse::Imu(att) => {
+            trace!("Got GPS imu: {:?}", att);
+            return;
+        }
+        UnifiedResponse::Toff(pps) => {
+            trace!("Got GPS pps: {:?}", pps);
+            return;
+        }
+        UnifiedResponse::Osc(osc) => {
+            trace!("Got GPS osc: {:?}", osc);
+            return;
+        }
+        UnifiedResponse::Poll(poll) => {
+            trace!("Got GPS poll: {:?}", poll);
+            return;
+        }
+        UnifiedResponse::Subframe(value) => {
+            trace!("Got GPS subframe: {:?}", value);
+            return;
+        }
+        e => {
+            warn!("Unknown message: {:?}", e);
+            return;
+        }
     };
 
     for msg in msgs {
@@ -163,10 +191,14 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
 
 const PPS: &str = "TPU/GPS2/PPS";
 fn parse_pps(pps: Pps, time: u64) -> Vec<PublishableMessage> {
-    vec![PublishableMessage {
-        topic: PPS.to_string(),
-        data: vec![pps.precision],
-        unit: "NTP precison",
-        time,
-    }]
+    if pps.precision.is_some() {
+        vec![PublishableMessage {
+            topic: PPS.to_string(),
+            data: vec![pps.precision.unwrap()],
+            unit: "NTP precison",
+            time,
+        }]
+    } else {
+        vec![]
+    }
 }

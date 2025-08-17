@@ -486,7 +486,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gpsd_proto"
 version = "1.0.0"
-source = "git+https://github.com/c-to-the-l/gpsd_proto.git#21a0fe5f2af327a74518b8f729cb90ab25fdb686"
+source = "git+https://github.com/Northeastern-Electric-Racing/gpsd_proto.git#bbd9e1da68335dd4ee4d7359f5ea57bdc4b7f220"
 dependencies = [
  "log",
  "serde",
