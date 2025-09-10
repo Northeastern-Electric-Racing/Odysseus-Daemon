@@ -484,6 +484,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
+name = "gpsd_proto"
+version = "1.0.0"
+source = "git+https://github.com/Northeastern-Electric-Racing/gpsd_proto.git#bbd9e1da68335dd4ee4d7359f5ea57bdc4b7f220"
+dependencies = [
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,6 +1129,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
+ "futures-util",
+ "gpsd_proto",
  "protobuf",
  "protobuf-codegen",
  "regex",
@@ -1129,6 +1142,7 @@ dependencies = [
  "sysinfo",
  "tokio",
  "tokio-serial",
+ "tokio-stream",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
@@ -1988,6 +2002,17 @@ dependencies = [
  "log",
  "mio-serial",
  "serialport",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-stream"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eca58d7bba4a75707817a2c44174253f9236b2d5fbd055602e9d5c07c139a047"
+dependencies = [
+ "futures-core",
+ "pin-project-lite",
  "tokio",
 ]
 
