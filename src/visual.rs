@@ -76,13 +76,13 @@ pub async fn run_save_pipeline(
                         let proc_id = val.id().unwrap_or_default();
                         // logic to safely shutdown since ffmpeg doesnt capture our fake ctrl+c from mqtt
                         // first try and run a SIGTERM kill
-                        if let Ok(mut child) = Command::new("kill").args(["-SIGTERM".to_string(), proc_id.to_string(), ]).spawn() {
+                        match Command::new("kill").args(["-SIGTERM".to_string(), proc_id.to_string(), ]).spawn() { Ok(mut child) => {
                             if let Err(err) = child.wait().await {
                                 warn!("Failed to gracefully kill ffmpeg: {}", err);
                             }
-                        } else {
+                        } _ => {
                             warn!("Failed to gracefully kill ffmpeg.");
-                        }
+                        }}
                         // then wait 12 seconds, each second check if the process exited
                         let mut tics_cnt = 0;
                         while tics_cnt < 12 {

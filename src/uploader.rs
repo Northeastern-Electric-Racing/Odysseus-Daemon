@@ -1,7 +1,7 @@
 use std::{fs, path::Path, time::Duration};
 
 use chrono::{DateTime, TimeZone, Utc};
-use reqwest::{multipart, Client};
+use reqwest::{Client, multipart};
 
 async fn upload_file(
     filepath: &Path,

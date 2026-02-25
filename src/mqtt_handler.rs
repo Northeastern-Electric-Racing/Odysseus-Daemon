@@ -5,11 +5,11 @@ use std::{
 
 use protobuf::{Message, SpecialFields};
 use rumqttc::v5::{
-    mqttbytes::{
-        v5::{Packet, Publish},
-        QoS,
-    },
     AsyncClient, Event, EventLoop, MqttOptions,
+    mqttbytes::{
+        QoS,
+        v5::{Packet, Publish},
+    },
 };
 use tokio::sync::{
     mpsc::{self, Receiver},
@@ -19,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
-    playback_data, serverdata, uploader::upload_files, HVTransition, PublishableMessage,
-    HV_EN_TOPIC, MUTE_EN_TOPIC, SAVE_LOCATION, SEND_LOGGER_DATA, SEND_SERIAL_DATA, SEND_VIDEO_DATA,
+    HV_EN_TOPIC, HVTransition, MUTE_EN_TOPIC, PublishableMessage, SAVE_LOCATION, SEND_LOGGER_DATA,
+    SEND_SERIAL_DATA, SEND_VIDEO_DATA, playback_data, serverdata, uploader::upload_files,
 };
 
 /// The chief processor of incoming mqtt data, this handles
@@ -159,14 +159,13 @@ impl MqttProcessor {
                             warn!("Could not parse topic, topic: {:?}", msg.topic);
                             continue;
                         };
-                        if let Some(ref sender) = self.mqtt_sys_send {
-                            if topic.starts_with("$SYS") {
+                        if let Some(ref sender) = self.mqtt_sys_send
+                            && topic.starts_with("$SYS") {
                             if let Err(err) = sender.send(msg).await {
                                 warn!("Could not send to SYS processor: {}", err);
                             }
                             continue;
-                            }
-                        };
+                            };
 
 
                         let Ok(res) = serverdata::ServerData::parse_from_bytes(&msg.payload) else {
@@ -232,12 +231,11 @@ impl MqttProcessor {
                             }
                         }
                         // if using it, send all mqtt messages to data logger
-                        if let Some(ref recv) = self.mqtt_recv_tx {
-                            if let Err(err) = recv.send(playback_data::PlaybackData{
+                        if let Some(ref recv) = self.mqtt_recv_tx
+                            && let Err(err) = recv.send(playback_data::PlaybackData{
                                 topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }).await {
                                 warn!("Error sending message received! {}", err);
                             }
-                        }
                     }
                     Err(e) => trace!("Recieved error: {}", e),
                     _ => {}

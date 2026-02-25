@@ -5,6 +5,7 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
+    HVTransition, PublishableMessage, SAVE_LOCATION,
     audible::audible_manager,
     can_handler::can_handler,
     daq_monitor::monitor_daq,
@@ -14,17 +15,16 @@ use odysseus_daemon::{
     numerical::collect_data,
     playback_data,
     sys_parser::sys_parser,
-    visual::{run_save_pipeline, SavePipelineOpts},
-    HVTransition, PublishableMessage, SAVE_LOCATION,
+    visual::{SavePipelineOpts, run_save_pipeline},
 };
-use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
+use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
     signal,
     sync::{mpsc, watch},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
 
 use socketcan::CanFrame;
 

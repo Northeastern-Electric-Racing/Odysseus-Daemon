@@ -8,7 +8,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
-use crate::{playback_data, HVTransition, SAVE_LOCATION};
+use crate::{HVTransition, SAVE_LOCATION, playback_data};
 
 /// runs the mute/unmute functionality
 /// Takes in a receiver of all MQTT messages
@@ -54,11 +54,10 @@ pub async fn logger_manager(
 
                 match msg  {
                     Some(msg) => {
-                        if let Some(writ) = writer.as_mut() {
-                            if let Err(err) = writ.write(&msg.write_length_delimited_to_bytes().unwrap()).await {
+                        if let Some(writ) = writer.as_mut()
+                            && let Err(err) = writ.write(&msg.write_length_delimited_to_bytes().unwrap()).await {
                                 warn!("Could not write to log! {}", err);
                             }
-                        }
                     },
                     None => {
                         warn!("Could not receive message!");
