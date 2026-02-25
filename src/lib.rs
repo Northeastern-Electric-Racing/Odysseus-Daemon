@@ -4,6 +4,7 @@ pub mod uploader;
 // MODULES
 pub mod audible;
 pub mod can_handler;
+pub mod color;
 pub mod daq;
 pub mod daq_monitor;
 pub mod lockdown;
@@ -38,7 +39,7 @@ pub struct HVOnData {
 }
 
 /// the topic to listen for for HV enable, 1 is on 0 is off
-pub const HV_EN_TOPIC: &str = "MPU/State/TSMS";
+pub const HV_EN_TOPIC: &str = "VCU/State/TSMS";
 
 /// the topic to listen for mute enable, 1 is on 0 is off
 pub const MUTE_EN_TOPIC: &str = "WHEEL/Buttons/Mute";

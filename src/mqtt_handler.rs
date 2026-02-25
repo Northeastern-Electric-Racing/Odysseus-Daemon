@@ -12,6 +12,7 @@ use rumqttc::v5::{
     },
 };
 use tokio::sync::{
+    broadcast,
     mpsc::{self, Receiver},
     watch::Sender,
 };
@@ -37,7 +38,7 @@ pub struct MqttProcessor {
     hv_stat_send: Sender<HVTransition>,
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
-    mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+    mqtt_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
     mqtt_sys_send: Option<mpsc::Sender<Publish>>,
     opts: MqttProcessorOptions,
 }
@@ -59,7 +60,7 @@ impl MqttProcessor {
         hv_stat_send: Sender<HVTransition>,
         augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
-        mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+        mqtt_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
         mqtt_sys_send: Option<mpsc::Sender<Publish>>,
         opts: MqttProcessorOptions,
     ) -> (MqttProcessor, MqttOptions) {
@@ -233,7 +234,7 @@ impl MqttProcessor {
                         // if using it, send all mqtt messages to data logger
                         if let Some(ref recv) = self.mqtt_recv_tx
                             && let Err(err) = recv.send(playback_data::PlaybackData{
-                                topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }).await {
+                                topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }) {
                                 warn!("Error sending message received! {}", err);
                             }
                     }

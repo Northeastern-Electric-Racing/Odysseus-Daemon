@@ -8,6 +8,7 @@ use odysseus_daemon::{
     HVTransition, PublishableMessage, SAVE_LOCATION,
     audible::audible_manager,
     can_handler::can_handler,
+    color::color_controller,
     daq_monitor::monitor_daq,
     lockdown::lockdown_runner,
     logger::logger_manager,
@@ -20,7 +21,7 @@ use odysseus_daemon::{
 use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
     signal,
-    sync::{mpsc, watch},
+    sync::{broadcast, mpsc, watch},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
@@ -71,6 +72,10 @@ struct VisualArgs {
     /// Enable Mosquitto SYS translator module
     #[arg(long, env = "ODYSSEUS_DAEMON_SYS_ENABLE")]
     sys: bool,
+
+    /// Enable wheel LED color controller
+    #[arg(long, env = "ODYSSEUS_DAEMON_COLOR_ENABLE")]
+    color: bool,
 
     /// The input video file
     #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
@@ -148,8 +153,8 @@ async fn main() {
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
     // create wildcard mqtt channel only if logger is enabled
-    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger {
-        let (tx, rx) = mpsc::channel::<playback_data::PlaybackData>(1000);
+    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger || cli.color {
+        let (tx, rx) = broadcast::channel::<playback_data::PlaybackData>(1000);
         (Some(tx), Some(rx))
     } else {
         (None, None)
@@ -238,7 +243,7 @@ async fn main() {
         info!("Running logger module");
         task_tracker.spawn(logger_manager(
             token.clone(),
-            mqtt_recv_rx.unwrap(),
+            mqtt_recv_rx.as_ref().unwrap().resubscribe(),
             hv_stat_recv.clone(),
         ));
     }
@@ -249,6 +254,11 @@ async fn main() {
             mqtt_sys_rx.unwrap(),
             mqtt_sender_tx,
         ));
+    }
+
+    if cli.color {
+        info!("Running color controller for wheel");
+        task_tracker.spawn(color_controller(token.clone(), mqtt_recv_rx.unwrap()));
     }
 
     task_tracker.close();
