@@ -21,8 +21,24 @@ struct StartupVars {
     pub curr_led: usize,
 }
 
+#[derive(Default)]
+enum Startup2VarsSequence {
+    #[default]
+    Red = 0,
+    Green,
+    Blue,
+    Off,
+}
+
+#[derive(Default)]
+struct Startup2Vars {
+    pub curr_led: usize,
+    pub curr_status: Startup2VarsSequence,
+}
+
 enum WheelMode {
     Startup(StartupVars),
+    Startup2(Startup2Vars),
 }
 
 const LED_BANK_WRITE_LISTINGS: [(&str, usize); LED_BANK_SIZE_FUCKED] = [
@@ -123,6 +139,39 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
             }
             new_settings
         }
+        WheelMode::Startup2(startup2_vars) => {
+            let mut new_settings = *last_settings;
+
+            match startup2_vars.curr_status {
+                Startup2VarsSequence::Red => {
+                    new_settings[startup2_vars.curr_led] =
+                        Srgb::from_components((1f32, 0f32, 0f32)).into_color();
+                    startup2_vars.curr_status = Startup2VarsSequence::Blue;
+                }
+                Startup2VarsSequence::Blue => {
+                    new_settings[startup2_vars.curr_led] =
+                        Srgb::from_components((0f32, 1f32, 0f32)).into_color();
+                    startup2_vars.curr_status = Startup2VarsSequence::Green;
+                }
+                Startup2VarsSequence::Green => {
+                    new_settings[startup2_vars.curr_led] =
+                        Srgb::from_components((0f32, 0f32, 1f32)).into_color();
+                    startup2_vars.curr_status = Startup2VarsSequence::Off;
+                    startup2_vars.curr_led = 0;
+                }
+                Startup2VarsSequence::Off => {
+                    new_settings[startup2_vars.curr_led] =
+                        Srgb::from_components((0f32, 0f32, 0f32)).into_color();
+                    startup2_vars.curr_status = Startup2VarsSequence::Red;
+                    startup2_vars.curr_led += 1;
+                    if startup2_vars.curr_led >= LED_BANK_SIZE_REAL {
+                        startup2_vars.curr_led = 0;
+                    }
+                }
+            }
+
+            new_settings
+        }
     }
 }
 
@@ -139,7 +188,7 @@ pub async fn color_controller(
     // smaller than fastexst human color change (about 13ms)
     let mut tick_size = tokio::time::interval(tokio::time::Duration::from_millis(10));
 
-    let mut current_mode = WheelMode::Startup(StartupVars::default());
+    let mut current_mode = WheelMode::Startup2(Startup2Vars::default());
     let current_brightness = 175;
     let mut last_settings: Settings = [
         Hsv::new(0.0, 0.0, 0.0),
