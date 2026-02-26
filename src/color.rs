@@ -6,7 +6,7 @@ use std::{array, path::PathBuf, str::FromStr};
  */
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::playback_data::PlaybackData;
 
@@ -73,6 +73,7 @@ async fn write_paths(
     path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED],
 ) -> () {
     for item in data.into_iter().zip(path_cache) {
+        trace!("Writing to file {:?}", item.1);
         if let Err(err) = tokio::fs::write(item.1, item.0).await {
             warn!("Could not write to file for color controller! {}", err);
         }
