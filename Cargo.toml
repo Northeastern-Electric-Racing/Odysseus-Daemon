@@ -23,7 +23,6 @@ regex = "1.12.2"
 #serialport = "4.7.2"
 tokio-serial = "5.4.5"
 palette = "0.7.6"
-const_format = { version = "0.2.35", features = ["fmt"] }
 heapless = "0.9.2"
 
 [build-dependencies]

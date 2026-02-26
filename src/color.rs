@@ -1,4 +1,6 @@
 use palette::{Hsv, IntoColor, LinSrgb, RgbHue, Srgb};
+use std::fmt::Debug;
+use std::time::Duration;
 use std::{array, path::PathBuf, str::FromStr};
 
 /**
@@ -6,22 +8,34 @@ use std::{array, path::PathBuf, str::FromStr};
  */
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::playback_data::PlaybackData;
 
+/// the number of leds
 const LED_BANK_SIZE_REAL: usize = 9;
+/// the number of sysfs multi-led objects
 const LED_BANK_SIZE_FUCKED: usize = 12;
+/// the cycle time the color algorithms are recomputed
+const CALC_CYCLE_TIME: Duration = Duration::from_millis(10);
 
+/// a color for high level userspace passing off
 type WheelColor = Hsv<palette::encoding::Srgb, f32>;
+/// the array of colors to make each LED in the banl
 type Settings = [WheelColor; LED_BANK_SIZE_REAL];
 
-#[derive(Default)]
+/// ------ README: Adding a new mode
+/// 1. Add it to WheelMode
+/// 2. Add it to match in from_settings to give it an official index
+/// 3. Add persistent variables you need to access when coding it to a <Name>Vars variable.  Make sure to derive or impl Default and Debug
+/// 4. Code the actual logic in the match in calculate_settings
+
+#[derive(Default, Debug)]
 struct StartupVars {
     pub curr_led: usize,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum Startup2VarsSequence {
     #[default]
     Red = 0,
@@ -30,17 +44,37 @@ enum Startup2VarsSequence {
     Off,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Startup2Vars {
     pub curr_led: usize,
     pub curr_status: Startup2VarsSequence,
+    pub last_refresh: Option<tokio::time::Instant>,
 }
 
+#[derive(Debug)]
 enum WheelMode {
+    /// A hue sweep of HSV on a loop
     Startup(StartupVars),
+    /// A RGB cycle through each LED
     Startup2(Startup2Vars),
 }
 
+impl WheelMode {
+    /// Convert from the MQTT settings to a valid Wheel Mode
+    /// If an invalid setting is passed in wheel mode is reset to Startup
+    fn from_settings(value: u8, extra_data: Vec<f32>) -> Self {
+        match value {
+            0 => Self::Startup(StartupVars::default()),
+            1 => Self::Startup2(Startup2Vars::default()),
+            2.. => {
+                warn!("Invalid mode, switching to startup!");
+                Self::Startup(StartupVars::default())
+            }
+        }
+    }
+}
+
+/// The registers to write to and how many 8 bit values they take up
 const LED_BANK_WRITE_LISTINGS: [(&str, usize); LED_BANK_SIZE_FUCKED] = [
     ("/sys/class/leds/l0:1/", 2),
     ("/sys/class/leds/l2:4/", 3),
@@ -63,6 +97,7 @@ const LED_BANK_WRITE_LISTINGS: [(&str, usize); LED_BANK_SIZE_FUCKED] = [
 fn translate_colorspace(
     data: [(u8, u8, u8); LED_BANK_SIZE_REAL],
 ) -> Result<[heapless::String<10>; LED_BANK_SIZE_FUCKED], heapless::CapacityError> {
+    // hande written because I dont care and its slightly more performant
     let ret: [heapless::String<10>; LED_BANK_SIZE_FUCKED] = [
         heapless::String::from_str(format!("{} {}", data[0].1, data[0].0).as_ref())?,
         heapless::String::from_str(format!("{} {} {}", data[0].2, data[1].1, data[1].0).as_ref())?,
@@ -82,7 +117,7 @@ fn translate_colorspace(
 }
 
 /**
- * Writes the paths of the LED driver to SysFS for color
+ * Writes the data to the given paths
  */
 async fn write_paths(
     data: [heapless::String<10>; LED_BANK_SIZE_FUCKED],
@@ -96,6 +131,9 @@ async fn write_paths(
     }
 }
 
+/**
+ * Writes to the path given a identical value for each and every path.  Useful for setting brightness
+ */
 async fn execute_brightness_step(brightness: u8, path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED]) {
     write_paths(
         // TODO replace with array::repeat
@@ -106,7 +144,7 @@ async fn execute_brightness_step(brightness: u8, path_cache: &[PathBuf; LED_BANK
 }
 
 /**
- * Runs a "tick" at which all of the LED settings are asynchronously entered
+ * Runs a "tick" at which all of the LED settings are asynchronously converted to RGB and sent
  */
 async fn execute_step(settings: Settings, path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED]) {
     let Ok(res) = translate_colorspace(settings.map(|f| {
@@ -122,9 +160,10 @@ async fn execute_step(settings: Settings, path_cache: &[PathBuf; LED_BANK_SIZE_F
 }
 
 /*
- * Uses the current mode to calculate the current LED conditions
+ * Uses the current mode to calculate the current LED conditions and returns them
+ * Returns None of no settings changes are required
  */
-fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Settings {
+fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<Settings> {
     match mode {
         WheelMode::Startup(startup_vars) => {
             let mut new_settings = *last_settings;
@@ -137,11 +176,21 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
                 }
                 new_settings[startup_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
             }
-            new_settings
+            Some(new_settings)
         }
         WheelMode::Startup2(startup2_vars) => {
             let mut new_settings = *last_settings;
 
+            match startup2_vars.last_refresh {
+                Some(time) => {
+                    if time.elapsed() > Duration::from_secs(1) {
+                        startup2_vars.last_refresh = Some(tokio::time::Instant::now());
+                    } else {
+                        return None;
+                    }
+                }
+                None => startup2_vars.last_refresh = Some(tokio::time::Instant::now()),
+            }
             match startup2_vars.curr_status {
                 Startup2VarsSequence::Red => {
                     new_settings[startup2_vars.curr_led] =
@@ -170,12 +219,15 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
                 }
             }
 
-            new_settings
+            Some(new_settings)
         }
     }
 }
 
-fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8) {
+/*
+ * Handle recieving a MQTT message, which could either do nothing or mutate the brightness or mode
+ */
+fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) {
     match msg.topic.as_str() {
         "Wheel/Control/LEDBrightness" => {
             let Some(val) = msg.values.first() else {
@@ -188,6 +240,14 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8) {
             }
             *brightness = (val * 255.0f32) as u8;
         }
+        "Wheel/Control/Mode" => {
+            let Some(val) = msg.values.first() else {
+                warn!("Empty mode command!");
+                return;
+            };
+            *mode = WheelMode::from_settings(*val as u8, vec![]);
+            info!("Switching color controller to mode: {:?}", mode);
+        }
         _ => {}
     }
 }
@@ -196,18 +256,23 @@ pub async fn color_controller(
     cancel_token: CancellationToken,
     mut mqtt_recv_rx: broadcast::Receiver<PlaybackData>,
 ) {
+    // cache the paths for quick reuse here, because building a Path is zero cost but also I am afraid
     let path_cache: [PathBuf; LED_BANK_SIZE_FUCKED] = LED_BANK_WRITE_LISTINGS.map(|f| {
         PathBuf::from_str(&format!("{}multi_intensity", f.0)).expect("Could not parse path")
     });
     let brightness_cache: [PathBuf; LED_BANK_SIZE_FUCKED] = LED_BANK_WRITE_LISTINGS
         .map(|f| PathBuf::from_str(&format!("{}brightness", f.0)).expect("Could not parse path"));
 
-    // smaller than fastexst human color change (about 13ms)
-    let mut tick_size = tokio::time::interval(tokio::time::Duration::from_millis(10));
+    // smaller than fastest human color change (about 13ms)
+    let mut tick_size = tokio::time::interval(CALC_CYCLE_TIME);
 
+    // this is the default boot mode defined here
     let mut current_mode = WheelMode::Startup2(Startup2Vars::default());
     let mut current_brightness = 175;
-    let mut do_exec_brightness = true;
+    // boot brightness is always zero for some reason with multi-led
+    let mut last_brightness = 0;
+
+    // default to all LEDs off before a boot mode kicks in
     let mut last_settings: Settings = [
         Hsv::new(0.0, 0.0, 0.0),
         Hsv::new(0.0, 0.0, 0.0),
@@ -227,17 +292,21 @@ pub async fn color_controller(
                 break;
             },
             _ = tick_size.tick() => {
-                if do_exec_brightness {
+                // only update brightness if it changes
+                if last_brightness != current_brightness {
+                    trace!("Updating brightness to {}", current_brightness);
                     execute_brightness_step(current_brightness, &brightness_cache).await;
-                    do_exec_brightness = false;
+                    last_brightness = current_brightness;
                 }
-                let settings = calculate_settings(&mut current_mode, &last_settings);
-                trace!("Writing new settings for color! {:?}", settings);
-                execute_step(settings, &path_cache).await;
-                last_settings = settings;
+                // only update settings if they change, as this write can be expensive
+                if let Some(settings) = calculate_settings(&mut current_mode, &last_settings) {
+                    trace!("Writing new settings for color! {:?}", settings);
+                    execute_step(settings, &path_cache).await;
+                    last_settings = settings;
+                }
             },
             Ok(msg) = mqtt_recv_rx.recv() => {
-                handle_recv_msg(msg, &mut current_brightness);
+                handle_recv_msg(msg, &mut current_brightness, &mut current_mode);
             }
         }
     }
