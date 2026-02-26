@@ -118,7 +118,7 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
                 .into_positive_degrees()
                 > 359.0
             {
-                new_settings[startup_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
+                new_settings[startup_vars.curr_led] = Hsv::from_components((360f32, 1f32, 1f32));
                 startup_vars.curr_led += 1;
                 if startup_vars.curr_led > LED_BANK_SIZE_REAL {
                     startup_vars.curr_led = 0;
