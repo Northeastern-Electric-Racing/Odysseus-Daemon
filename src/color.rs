@@ -32,7 +32,7 @@ const LED_BANK_WRITE_LISTINGS: [(&str, usize); LED_BANK_SIZE_FUCKED] = [
     ("/sys/class/leds/l7:8/", 2),
     ("/sys/class/leds/l9:11/", 3),
     ("/sys/class/leds/l12:13/", 2),
-    ("/sys/class/leds/l4:15/", 2),
+    ("/sys/class/leds/l14:15/", 2),
     ("/sys/class/leds/l16:17/", 2),
     ("/sys/class/leds/m0:1/", 2),
     ("/sys/class/leds/m2:4/", 3),
