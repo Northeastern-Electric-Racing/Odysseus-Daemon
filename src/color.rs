@@ -73,7 +73,7 @@ async fn write_paths(
     path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED],
 ) -> () {
     for item in data.into_iter().zip(path_cache) {
-        trace!("Writing to file {:?}", item.1);
+        trace!("Color: Writing to file {:?} with {}", item.1, item.0);
         if let Err(err) = tokio::fs::write(item.1, item.0).await {
             warn!("Could not write to file for color controller! {}", err);
         }
@@ -124,7 +124,6 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
                     startup_vars.curr_led = 0;
                 }
             }
-
             new_settings
         }
     }
@@ -167,6 +166,7 @@ pub async fn color_controller(
             },
             _ = tick_size.tick() => {
                 let settings = calculate_settings(&mut current_mode, &last_settings);
+                trace!("Writing new settings for color! {:?}", settings);
                 execute_step(settings, &path_cache).await;
                 last_settings = settings;
             }
