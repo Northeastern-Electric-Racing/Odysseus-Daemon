@@ -81,7 +81,8 @@ async fn write_paths(
 
 async fn execute_brightness_step(brightness: u8, path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED]) {
     write_paths(
-        array::repeat(heapless::String::from_str(&brightness.to_string()).unwrap()),
+        // TODO replace with array::repeat
+        array::from_fn(|_| heapless::String::from_str(&brightness.to_string()).unwrap()),
         path_cache,
     )
     .await;
