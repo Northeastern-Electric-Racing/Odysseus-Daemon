@@ -175,9 +175,26 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
     }
 }
 
+fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8) {
+    match msg.topic.as_str() {
+        "Wheel/Control/LEDBrightness" => {
+            let Some(val) = msg.values.first() else {
+                warn!("Empty brightness command");
+                return;
+            };
+            if *val < 0.0f32 || *val > 1.0f32 {
+                warn!("Invalid brightness value: {}", val);
+                return;
+            }
+            *brightness = (val * 255.0f32) as u8;
+        }
+        _ => {}
+    }
+}
+
 pub async fn color_controller(
     cancel_token: CancellationToken,
-    _mqtt_recv_rx: broadcast::Receiver<PlaybackData>,
+    mut mqtt_recv_rx: broadcast::Receiver<PlaybackData>,
 ) {
     let path_cache: [PathBuf; LED_BANK_SIZE_FUCKED] = LED_BANK_WRITE_LISTINGS.map(|f| {
         PathBuf::from_str(&format!("{}multi_intensity", f.0)).expect("Could not parse path")
@@ -189,7 +206,8 @@ pub async fn color_controller(
     let mut tick_size = tokio::time::interval(tokio::time::Duration::from_millis(10));
 
     let mut current_mode = WheelMode::Startup2(Startup2Vars::default());
-    let current_brightness = 175;
+    let mut current_brightness = 175;
+    let mut do_exec_brightness = true;
     let mut last_settings: Settings = [
         Hsv::new(0.0, 0.0, 0.0),
         Hsv::new(0.0, 0.0, 0.0),
@@ -202,8 +220,6 @@ pub async fn color_controller(
         Hsv::new(0.0, 0.0, 0.0),
     ];
 
-    execute_brightness_step(current_brightness, &brightness_cache).await;
-
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
@@ -211,10 +227,17 @@ pub async fn color_controller(
                 break;
             },
             _ = tick_size.tick() => {
+                if do_exec_brightness {
+                    execute_brightness_step(current_brightness, &brightness_cache).await;
+                    do_exec_brightness = false;
+                }
                 let settings = calculate_settings(&mut current_mode, &last_settings);
                 trace!("Writing new settings for color! {:?}", settings);
                 execute_step(settings, &path_cache).await;
                 last_settings = settings;
+            },
+            Ok(msg) = mqtt_recv_rx.recv() => {
+                handle_recv_msg(msg, &mut current_brightness);
             }
         }
     }
