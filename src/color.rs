@@ -113,12 +113,8 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Setting
         WheelMode::Startup(startup_vars) => {
             let mut new_settings = *last_settings;
             new_settings[startup_vars.curr_led].hue += RgbHue::from_degrees(1f32);
-            if new_settings[startup_vars.curr_led]
-                .hue
-                .into_positive_degrees()
-                > 359.0
-            {
-                new_settings[startup_vars.curr_led] = Hsv::from_components((358f32, 1f32, 1f32));
+            if new_settings[startup_vars.curr_led].hue.into_degrees() > 179f32 {
+                new_settings[startup_vars.curr_led] = Hsv::from_components((175f32, 1f32, 1f32));
                 startup_vars.curr_led += 1;
                 new_settings[startup_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
                 if startup_vars.curr_led > LED_BANK_SIZE_REAL {
