@@ -225,29 +225,34 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
 
 /*
  * Handle recieving a MQTT message, which could either do nothing or mutate the brightness or mode
+ * Returns whether existing settings should be reset
  */
-fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) {
+fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) -> bool {
     match msg.topic.as_str() {
         "Wheel/Control/LEDBrightness" => {
             let Some(val) = msg.values.first() else {
                 warn!("Empty brightness command");
-                return;
+                return false;
             };
             if *val < 0.0f32 || *val > 1.0f32 {
                 warn!("Invalid brightness value: {}", val);
-                return;
+                return false;
             }
             *brightness = (val * 255.0f32) as u8;
+            return false;
         }
         "Wheel/Control/Mode" => {
             let Some(val) = msg.values.first() else {
                 warn!("Empty mode command!");
-                return;
+                return false;
             };
             *mode = WheelMode::from_settings(*val as u8, vec![]);
             info!("Switching color controller to mode: {:?}", mode);
+            return true;
         }
-        _ => {}
+        _ => {
+            return false;
+        }
     }
 }
 
@@ -305,7 +310,19 @@ pub async fn color_controller(
                 }
             },
             Ok(msg) = mqtt_recv_rx.recv() => {
-                handle_recv_msg(msg, &mut current_brightness, &mut current_mode);
+                if handle_recv_msg(msg, &mut current_brightness, &mut current_mode) {
+                    last_settings = [
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                        Hsv::new(0.0, 0.0, 0.0),
+                    ];
+                }
             }
         }
     }
