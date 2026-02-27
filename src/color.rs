@@ -206,7 +206,6 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
                     new_settings[startup2_vars.curr_led] =
                         Srgb::from_components((0f32, 0f32, 1f32)).into_color();
                     startup2_vars.curr_status = Startup2VarsSequence::Off;
-                    startup2_vars.curr_led = 0;
                 }
                 Startup2VarsSequence::Off => {
                     new_settings[startup2_vars.curr_led] =
