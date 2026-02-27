@@ -15,7 +15,8 @@ Modules
 - `lockdown`: Feature disabler and modifier upon HV enablement.  Status: Beta
 - `audible`: Call feature trigger and monitor.  Status: Beta
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
-- `logger`: MQTT receiver and disk logger. Status: Alpha
+- `logger`: MQTT receiver and disk logger. Status: Beta
+- `color`: The wheel LED controller and API system. Status: Alpha
 
 Upload modules:
 - `logger`: Upload from the logger module to scylla. Status: Beta
