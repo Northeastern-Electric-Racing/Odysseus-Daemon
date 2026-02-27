@@ -99,18 +99,18 @@ fn translate_colorspace(
 ) -> Result<[heapless::String<10>; LED_BANK_SIZE_FUCKED], heapless::CapacityError> {
     // hande written because I dont care and its slightly more performant
     let ret: [heapless::String<10>; LED_BANK_SIZE_FUCKED] = [
-        heapless::String::from_str(format!("{} {}", data[0].1, data[0].0).as_ref())?,
+        heapless::String::from_str(format!("{} {} 0", data[0].1, data[0].0).as_ref())?,
         heapless::String::from_str(format!("{} {} {}", data[0].2, data[1].1, data[1].0).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[1].2, data[2].1).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[2].0, data[2].2).as_ref())?,
+        heapless::String::from_str(format!("0 {} {}", data[1].2, data[2].1).as_ref())?,
+        heapless::String::from_str(format!("{} {} 0", data[2].0, data[2].2).as_ref())?,
         heapless::String::from_str(format!("{} {} {}", data[3].1, data[3].0, data[3].2).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[4].1, data[4].0).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[4].2, data[5].1).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[5].0, data[5].2).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[6].1, data[6].0).as_ref())?,
+        heapless::String::from_str(format!("{} 0 {}", data[4].1, data[4].0).as_ref())?,
+        heapless::String::from_str(format!("0 {} {}", data[4].2, data[5].1).as_ref())?,
+        heapless::String::from_str(format!("{} {} 0", data[5].0, data[5].2).as_ref())?,
+        heapless::String::from_str(format!("{} {} 0", data[6].1, data[6].0).as_ref())?,
         heapless::String::from_str(format!("{} {} {}", data[6].2, data[7].1, data[7].0).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[7].2, data[8].1).as_ref())?,
-        heapless::String::from_str(format!("{} {}", data[8].0, data[8].2).as_ref())?,
+        heapless::String::from_str(format!("0 {} {}", data[7].2, data[8].1).as_ref())?,
+        heapless::String::from_str(format!("{} {} 0", data[8].0, data[8].2).as_ref())?,
     ];
 
     Ok(ret)
