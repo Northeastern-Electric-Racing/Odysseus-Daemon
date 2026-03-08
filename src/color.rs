@@ -29,6 +29,10 @@ type Settings = [WheelColor; LED_BANK_SIZE_REAL];
 /// 2. Add it to match in from_settings to give it an official index
 /// 3. Add persistent variables you need to access when coding it to a <Name>Vars variable.  Make sure to derive or impl Default and Debug
 /// 4. Code the actual logic in the match in calculate_settings
+///
+///
+/// ----- README: Adding a new follower (follower mode edit, so the lights follow a specific pattern)
+/// 1. Add it to FollowerItemSettings::from_idex()
 
 #[derive(Default, Debug)]
 struct StartupVars {
@@ -51,12 +55,69 @@ struct Startup2Vars {
     pub last_refresh: Option<tokio::time::Instant>,
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+struct FollowerItemSettings {
+    pub topic: &'static str,
+    pub min: f32,
+    pub max: f32,
+}
+
+impl FollowerItemSettings {
+    fn from_idex(idex: usize) -> Self {
+        match idex {
+            0 => FollowerItemSettings {
+                topic: "BMS/Status/Temp_Internal",
+                min: 10f32,
+                max: 60f32,
+            },
+            1 => FollowerItemSettings {
+                topic: "VCU/State/Speed",
+                min: 0f32,
+                max: 100f32,
+            },
+            2.. => {
+                warn!("Invalid follower item: {}, using default", idex);
+                FollowerItemSettings {
+                    topic: "NERO/FlappyBirdScore",
+                    min: 0f32,
+                    max: 20f32,
+                }
+            }
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+struct FollowerSettings {
+    pub lr: FollowerItemSettings,
+    pub color: FollowerItemSettings,
+
+    pub lr_val: f32,
+    pub color_val: f32,
+}
+
+impl FollowerSettings {
+    fn to_follower_settings(a: usize, b: usize) -> FollowerSettings {
+        let lr = FollowerItemSettings::from_idex(a);
+        let color = FollowerItemSettings::from_idex(b);
+        FollowerSettings {
+            lr,
+            color,
+
+            lr_val: lr.min,
+            color_val: color.min,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum WheelMode {
     /// A hue sweep of HSV on a loop
     Startup(StartupVars),
     /// A RGB cycle through each LED
     Startup2(Startup2Vars),
+    /// A follower.  The first extra number defines the follower left to right, the 2nd defines the follower for coloring
+    Follower(FollowerSettings),
 }
 
 impl WheelMode {
@@ -66,7 +127,18 @@ impl WheelMode {
         match value {
             0 => Self::Startup(StartupVars::default()),
             1 => Self::Startup2(Startup2Vars::default()),
-            2.. => {
+            2 => {
+                if extra_data.len() < 2 {
+                    warn!("Invalid mode, switching to startup!");
+                    Self::Startup(StartupVars::default())
+                } else {
+                    Self::Follower(FollowerSettings::to_follower_settings(
+                        *extra_data.first().unwrap() as usize,
+                        *extra_data.get(1).unwrap() as usize,
+                    ))
+                }
+            }
+            3.. => {
                 warn!("Invalid mode, switching to startup!");
                 Self::Startup(StartupVars::default())
             }
@@ -220,6 +292,7 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
 
             Some(new_settings)
         }
+        WheelMode::Follower(settings) => todo!(),
     }
 }
 
@@ -228,6 +301,23 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
  * Returns whether existing settings should be reset
  */
 fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) -> bool {
+    // handle following
+    match mode {
+        WheelMode::Startup(_) => (),
+        WheelMode::Startup2(_) => (),
+        WheelMode::Follower(settings) => {
+            if msg.topic == settings.lr.topic {
+                if let Some(val) = msg.values.first() {
+                    settings.lr_val = *val;
+                }
+            } else if msg.topic == settings.color.topic {
+                if let Some(val) = msg.values.first() {
+                    settings.color_val = *val;
+                }
+            }
+            return false;
+        }
+    }
     match msg.topic.as_str() {
         "Wheel/Control/LEDBrightness" => {
             let Some(val) = msg.values.first() else {
