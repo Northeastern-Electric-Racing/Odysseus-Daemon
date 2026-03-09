@@ -313,7 +313,7 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
                 // there are effectively 8 steps since the first one is always on
                 ((LED_BANK_SIZE_REAL - 1) as f32
                     * ((settings.lr_val - settings.lr.min) / (settings.lr.max - settings.lr.min)))
-                    .floor() as usize
+                    .round() as usize
                     + 1
             };
 
@@ -349,16 +349,17 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
         WheelMode::Startup(_) => (),
         WheelMode::Startup2(_) => (),
         WheelMode::Follower(settings) => {
-            if msg.topic == settings.lr.topic {
-                if let Some(val) = msg.values.first() {
-                    settings.lr_val = *val;
-                }
+            if msg.topic == settings.lr.topic
+                && let Some(val) = msg.values.first()
+            {
+                settings.lr_val = *val;
+                return false;
             } else if msg.topic == settings.color.topic
                 && let Some(val) = msg.values.first()
             {
                 settings.color_val = *val;
+                return false;
             }
-            return false;
         }
     }
     match msg.topic.as_str() {
