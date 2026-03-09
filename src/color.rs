@@ -79,7 +79,7 @@ impl FollowerItemSettings {
                 color_range: (RgbHue::from(-40f32), RgbHue::from_degrees(169f32)),
             },
             1 => FollowerItemSettings {
-                topic: "VCU/State/Speed",
+                topic: "VCU/CarState/Speed",
                 min: 0f32,
                 max: 100f32,
                 color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
@@ -133,7 +133,7 @@ enum WheelMode {
 impl WheelMode {
     /// Convert from the MQTT settings to a valid Wheel Mode
     /// If an invalid setting is passed in wheel mode is reset to Startup
-    fn from_settings(value: u8, extra_data: Vec<f32>) -> Self {
+    fn from_settings(value: u8, extra_data: &[f32]) -> Self {
         match value {
             0 => Self::Startup(StartupVars::default()),
             1 => Self::Startup2(Startup2Vars::default()),
@@ -379,7 +379,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
                 warn!("Empty mode command!");
                 return false;
             };
-            *mode = WheelMode::from_settings(*val as u8, vec![]);
+            *mode = WheelMode::from_settings(*val as u8, &msg.values[1..]);
             info!("Switching color controller to mode: {:?}", mode);
             true
         }
