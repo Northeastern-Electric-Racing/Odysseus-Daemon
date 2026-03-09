@@ -57,9 +57,17 @@ struct Startup2Vars {
 
 #[derive(Default, Debug, Clone, Copy)]
 struct FollowerItemSettings {
+    /// the topic name to get the data from
     pub topic: &'static str,
+    /// the minimum value to display
     pub min: f32,
+    /// the maximum value to display
     pub max: f32,
+    /// the color range to represent (only used in color mode) (min=>max)
+    /// Use a site like https://www.hslpicker.com/#00ff6a to decide this
+    pub color_range: (RgbHue, RgbHue),
+    /// whether to travel from min to max positively (false) or min to max negatively (true)
+    pub invert_color_range: bool,
 }
 
 impl FollowerItemSettings {
@@ -69,11 +77,16 @@ impl FollowerItemSettings {
                 topic: "BMS/Status/Temp_Internal",
                 min: 10f32,
                 max: 60f32,
+                // green to red with number increasing
+                color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
+                invert_color_range: true,
             },
             1 => FollowerItemSettings {
                 topic: "VCU/State/Speed",
                 min: 0f32,
                 max: 100f32,
+                color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
+                invert_color_range: true,
             },
             2.. => {
                 warn!("Invalid follower item: {}, using default", idex);
@@ -81,6 +94,8 @@ impl FollowerItemSettings {
                     topic: "NERO/FlappyBirdScore",
                     min: 0f32,
                     max: 20f32,
+                    color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
+                    invert_color_range: true,
                 }
             }
         }
@@ -292,7 +307,44 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
 
             Some(new_settings)
         }
-        WheelMode::Follower(settings) => todo!(),
+        WheelMode::Follower(settings) => {
+            let mut new_settings = *last_settings;
+            // first handle the lr, getting amt_on, the amount of LEDs that should be lit (left to right)
+            let amt_on = if settings.lr_val >= settings.lr.max {
+                LED_BANK_SIZE_REAL
+            } else if settings.lr_val <= settings.lr.min {
+                1 // always one led on
+            } else {
+                // there are effectively 8 steps since the first one is always on
+                ((LED_BANK_SIZE_REAL - 1) as f32
+                    * ((settings.lr_val - settings.lr.min) / (settings.lr.max - settings.lr.min)))
+                    .floor() as usize
+                    + 1
+            };
+
+            // now get the hue of each lit up LED
+            let multiplier = (settings.color_val - settings.color.min)
+                / (settings.color.max - settings.color.min);
+            let hue_raw = if settings.color.invert_color_range {
+                multiplier * settings.color.color_range.0.into_positive_degrees()
+            } else {
+                (multiplier
+                    * (settings.color.color_range.1 - settings.color.color_range.0)
+                        .into_positive_degrees())
+                    + settings.color.color_range.0.into_positive_degrees()
+            };
+
+            for (index, value) in new_settings.iter_mut().enumerate() {
+                if index + 1 > amt_on {
+                    *value = Hsv::new_srgb_const(RgbHue::new(0.0f32), 0.0f32, 0.0f32);
+                    continue;
+                } else {
+                    *value = Hsv::new_srgb_const(RgbHue::new(hue_raw), 1.0f32, 1.0f32);
+                }
+            }
+
+            Some(new_settings)
+        }
     }
 }
 
@@ -310,10 +362,10 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
                 if let Some(val) = msg.values.first() {
                     settings.lr_val = *val;
                 }
-            } else if msg.topic == settings.color.topic {
-                if let Some(val) = msg.values.first() {
-                    settings.color_val = *val;
-                }
+            } else if msg.topic == settings.color.topic
+                && let Some(val) = msg.values.first()
+            {
+                settings.color_val = *val;
             }
             return false;
         }
@@ -329,7 +381,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
                 return false;
             }
             *brightness = (val * 255.0f32) as u8;
-            return false;
+            false
         }
         "Wheel/Control/Mode" => {
             let Some(val) = msg.values.first() else {
@@ -338,11 +390,9 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
             };
             *mode = WheelMode::from_settings(*val as u8, vec![]);
             info!("Switching color controller to mode: {:?}", mode);
-            return true;
+            true
         }
-        _ => {
-            return false;
-        }
+        _ => false,
     }
 }
 
@@ -394,9 +444,12 @@ pub async fn color_controller(
                 }
                 // only update settings if they change, as this write can be expensive
                 if let Some(settings) = calculate_settings(&mut current_mode, &last_settings) {
-                    trace!("Writing new settings for color! {:?}", settings);
-                    execute_step(settings, &path_cache).await;
-                    last_settings = settings;
+                    // yet another check
+                    if settings != last_settings {
+                        trace!("Writing new settings for color! {:?}", settings);
+                        execute_step(settings, &path_cache).await;
+                        last_settings = settings;
+                    }
                 }
             },
             Ok(msg) = mqtt_recv_rx.recv() => {
