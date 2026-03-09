@@ -66,8 +66,6 @@ struct FollowerItemSettings {
     /// the color range to represent (only used in color mode) (min=>max)
     /// Use a site like https://www.hslpicker.com/#00ff6a to decide this
     pub color_range: (RgbHue, RgbHue),
-    /// whether to travel from min to max positively (false) or min to max negatively (true)
-    pub invert_color_range: bool,
 }
 
 impl FollowerItemSettings {
@@ -78,15 +76,13 @@ impl FollowerItemSettings {
                 min: 10f32,
                 max: 60f32,
                 // green to red with number increasing
-                color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
-                invert_color_range: true,
+                color_range: (RgbHue::from(-40f32), RgbHue::from_degrees(169f32)),
             },
             1 => FollowerItemSettings {
                 topic: "VCU/State/Speed",
                 min: 0f32,
                 max: 100f32,
                 color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
-                invert_color_range: true,
             },
             2.. => {
                 warn!("Invalid follower item: {}, using default", idex);
@@ -95,7 +91,6 @@ impl FollowerItemSettings {
                     min: 0f32,
                     max: 20f32,
                     color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
-                    invert_color_range: true,
                 }
             }
         }
@@ -325,14 +320,10 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
             // now get the hue of each lit up LED
             let multiplier = (settings.color_val - settings.color.min)
                 / (settings.color.max - settings.color.min);
-            let hue_raw = if settings.color.invert_color_range {
-                multiplier * settings.color.color_range.0.into_positive_degrees()
-            } else {
-                (multiplier
-                    * (settings.color.color_range.1 - settings.color.color_range.0)
-                        .into_positive_degrees())
-                    + settings.color.color_range.0.into_positive_degrees()
-            };
+            let hue_raw = (multiplier
+                * (settings.color.color_range.1.into_positive_degrees()
+                    - settings.color.color_range.0.into_positive_degrees()))
+                + settings.color.color_range.0.into_positive_degrees();
 
             for (index, value) in new_settings.iter_mut().enumerate() {
                 if index + 1 > amt_on {
