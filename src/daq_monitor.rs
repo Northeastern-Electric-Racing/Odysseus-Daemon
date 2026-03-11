@@ -5,8 +5,8 @@ use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
-use crate::daq::collect_daq;
 use crate::PublishableMessage;
+use crate::daq::collect_daq;
 
 use std::time::Duration;
 
