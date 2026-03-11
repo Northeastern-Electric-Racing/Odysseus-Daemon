@@ -363,7 +363,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
         }
     }
     match msg.topic.as_str() {
-        "Wheel/Control/LEDBrightness" => {
+        "NERO/Control/LEDBrightness" => {
             let Some(val) = msg.values.first() else {
                 warn!("Empty brightness command");
                 return false;
@@ -375,7 +375,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
             *brightness = (val * 255.0f32) as u8;
             false
         }
-        "Wheel/Control/Mode" => {
+        "NERO/Control/Mode" => {
             let Some(val) = msg.values.first() else {
                 warn!("Empty mode command!");
                 return false;
