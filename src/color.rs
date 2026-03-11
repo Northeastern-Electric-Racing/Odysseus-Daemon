@@ -36,6 +36,7 @@ type Settings = [WheelColor; LED_BANK_SIZE_REAL];
 
 #[derive(Default, Debug)]
 struct StartupVars {
+    /// the LED we are currently cycling through
     pub curr_led: usize,
 }
 
@@ -50,8 +51,11 @@ enum Startup2VarsSequence {
 
 #[derive(Default, Debug)]
 struct Startup2Vars {
+    /// The current LED we are cycling through
     pub curr_led: usize,
+    /// the color we are currently on
     pub curr_status: Startup2VarsSequence,
+    /// when the color was last switched
     pub last_refresh: Option<tokio::time::Instant>,
 }
 
@@ -59,9 +63,9 @@ struct Startup2Vars {
 struct FollowerItemSettings {
     /// the topic name to get the data from
     pub topic: &'static str,
-    /// the minimum value to display
+    /// the minimum value to display when ranging color or LEDs
     pub min: f32,
-    /// the maximum value to display
+    /// the maximum value to display when ranging color or LEDs
     pub max: f32,
     /// the color range to represent (only used in color mode) (min=>max)
     /// Use a site like https://www.hslpicker.com/#00ff6a to decide this
@@ -69,6 +73,7 @@ struct FollowerItemSettings {
 }
 
 impl FollowerItemSettings {
+    // ADD NEW FOLLOWER HERE
     fn from_idex(idex: usize) -> Self {
         match idex {
             0 => FollowerItemSettings {
@@ -127,6 +132,7 @@ enum WheelMode {
     /// A RGB cycle through each LED
     Startup2(Startup2Vars),
     /// A follower.  The first extra number defines the follower left to right, the 2nd defines the follower for coloring
+    /// See FollowerItemSettings::from_idex()
     Follower(FollowerSettings),
 }
 
@@ -142,6 +148,7 @@ impl WheelMode {
                     warn!("Invalid mode, switching to startup!");
                     Self::Startup(StartupVars::default())
                 } else {
+                    // Follower takes in two indexes from FollowerItemSettings to determine reactivity
                     Self::Follower(FollowerSettings::to_follower_settings(
                         *extra_data.first().unwrap() as usize,
                         *extra_data.get(1).unwrap() as usize,
