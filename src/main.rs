@@ -12,7 +12,7 @@ use odysseus_daemon::{
     daq_monitor::monitor_daq,
     lockdown::lockdown_runner,
     logger::logger_manager,
-    mqtt_handler::{MqttProcessor, MqttProcessorOptions},
+    mqtt_handler::MqttProcessor,
     numerical::collect_data,
     playback_data,
     sys_parser::sys_parser,
@@ -92,7 +92,7 @@ struct VisualArgs {
 
     /// The Scylla URL
     #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
-    scylla_url: String,
+    scylla_url: Option<String>,
 
     /// The output folder of data (videos, audio, text logs, etc), no trailing slash
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
@@ -181,10 +181,8 @@ async fn main() {
         mute_stat_send,
         mqtt_recv_tx,
         mqtt_sys_tx,
-        MqttProcessorOptions {
-            mqtt_path: cli.mqtt_url,
-            scylla_url: cli.scylla_url,
-        },
+        cli.mqtt_url,
+        cli.scylla_url,
     );
     let (client, eventloop) = AsyncClient::new(opts, 600);
     let client_sharable: Arc<AsyncClient> = Arc::new(client);
