@@ -18,7 +18,7 @@ serde_json = "1.0.145"
 sysinfo = "0.38.4"
 tokio-util = { version = "0.7.18", features = ["full"] }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.22", features = ["ansi", "env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["ansi", "env-filter"] }
 regex = "1.12.3"
 #serialport = "4.7.2"
 tokio-serial = "5.4.5"
