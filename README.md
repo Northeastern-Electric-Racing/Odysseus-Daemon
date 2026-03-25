@@ -11,12 +11,14 @@ Core principles:
 
 
 Modules
-- `visual`: Camera process manager and writer.  Status: Beta
+- `visual`: Camera process manager and writer.  Status: Alpha
 - `lockdown`: Feature disabler and modifier upon HV enablement.  Status: Beta
-- `audible`: Call feature trigger and monitor.  Status: Beta
+- `audible`: Call feature trigger and monitor.  Status: Alpha
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
+- `net`: Network statistics telemetry scraper and sender for both TPU and Base Station. Status: Alpha
 - `logger`: MQTT receiver and disk logger. Status: Beta
 - `color`: The wheel LED controller and API system. Status: Alpha
+- `daq`: The Jack DAQ serial scraper. Status: Beta
 
 Upload modules:
 - `logger`: Upload from the logger module to scylla. Status: Beta

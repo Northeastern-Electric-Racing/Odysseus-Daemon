@@ -160,28 +160,30 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
         time,
     });
 
-    if tpv.speed.is_some() {
+    if let Some(tpv_speed) = tpv.speed {
         ret.push(PublishableMessage {
             topic: SPEED.to_string(),
-            data: vec![tpv.speed.unwrap()],
+            data: vec![tpv_speed],
             unit: "knot",
             time,
         });
     }
 
-    if tpv.lat.is_some() && tpv.lon.is_some() {
+    if let Some(lat) = tpv.lat
+        && let Some(lon) = tpv.lon
+    {
         ret.push(PublishableMessage {
             topic: COORDS.to_string(),
-            data: vec![tpv.lat.unwrap() as f32, tpv.lon.unwrap() as f32],
+            data: vec![lat as f32, lon as f32],
             unit: "coordinate",
             time,
         });
     }
 
-    if tpv.alt_hae.is_some() {
+    if let Some(tpv_alt_hae) = tpv.alt_hae {
         ret.push(PublishableMessage {
             topic: ALT.to_string(),
-            data: vec![tpv.alt_hae.unwrap()],
+            data: vec![tpv_alt_hae],
             unit: "meter",
             time,
         });
@@ -191,10 +193,10 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
 
 const PPS: &str = "TPU/GPS2/PPS";
 fn parse_pps(pps: Pps, time: u64) -> Vec<PublishableMessage> {
-    if pps.precision.is_some() {
+    if let Some(pps_precision) = pps.precision {
         vec![PublishableMessage {
             topic: PPS.to_string(),
-            data: vec![pps.precision.unwrap()],
+            data: vec![pps_precision],
             unit: "NTP precison",
             time,
         }]

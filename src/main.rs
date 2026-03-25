@@ -14,6 +14,7 @@ use odysseus_daemon::{
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::MqttProcessor,
+    net::network_scraper,
     numerical::collect_data,
     playback_data,
     sys_parser::sys_parser,
@@ -111,6 +112,18 @@ struct VisualArgs {
     /// Whether to enable the GPS module
     #[arg(long, env = "ODYSSEUS_DAEMON_GPS")]
     gps: bool,
+
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_NET_STATS")]
+    net: bool,
+
+    /// The internet interfaces to gather statistics from
+    #[arg(long, env = "ODYSSEUS_DAEMON_NET_IFACES")]
+    ifaces: Option<Vec<String>>,
+
+    /// The base MQTT topic/node name
+    #[arg(long, env = "ODYSSEUS_DAEMON_BASE_NODE", default_value = "TPU")]
+    base_node: String,
 }
 
 /// Folder hierarchy
@@ -266,12 +279,24 @@ async fn main() {
 
     if cli.gps {
         info!("Running GPS Manager");
-        task_tracker.spawn(gps_manager(token.clone(), mqtt_sender_tx));
+        task_tracker.spawn(gps_manager(token.clone(), mqtt_sender_tx.clone()));
     }
-  
+
     if cli.color {
         info!("Running color controller for wheel");
         task_tracker.spawn(color_controller(token.clone(), mqtt_recv_rx.unwrap()));
+    }
+
+    if cli.net
+        && let Some(ifaces) = cli.ifaces
+    {
+        info!("Running network statistics scraper");
+        task_tracker.spawn(network_scraper(
+            token.clone(),
+            mqtt_sender_tx,
+            cli.base_node,
+            ifaces,
+        ));
     }
 
     task_tracker.close();
