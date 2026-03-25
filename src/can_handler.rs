@@ -2,7 +2,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
-use socketcan::{tokio::CanSocket, CanFrame};
+use socketcan::{CanFrame, tokio::CanSocket};
 
 pub async fn can_handler(
     cancel_token: CancellationToken,

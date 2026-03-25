@@ -5,26 +5,27 @@ use std::{
 
 use clap::Parser;
 use odysseus_daemon::{
+    HVTransition, PublishableMessage, SAVE_LOCATION,
     audible::audible_manager,
     can_handler::can_handler,
+    color::color_controller,
     daq_monitor::monitor_daq,
     lockdown::lockdown_runner,
     logger::logger_manager,
-    mqtt_handler::{MqttProcessor, MqttProcessorOptions},
+    mqtt_handler::MqttProcessor,
     numerical::collect_data,
     playback_data,
     sys_parser::sys_parser,
-    visual::{run_save_pipeline, SavePipelineOpts},
-    HVTransition, PublishableMessage, SAVE_LOCATION,
+    visual::{SavePipelineOpts, run_save_pipeline},
 };
-use rumqttc::v5::{mqttbytes::v5::Publish, AsyncClient};
+use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
     signal,
-    sync::{mpsc, watch},
+    sync::{broadcast, mpsc, watch},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
 
 use socketcan::CanFrame;
 
@@ -72,6 +73,10 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_SYS_ENABLE")]
     sys: bool,
 
+    /// Enable wheel LED color controller
+    #[arg(long, env = "ODYSSEUS_DAEMON_COLOR_ENABLE")]
+    color: bool,
+
     /// The input video file
     #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
     video_uri: Option<String>,
@@ -87,7 +92,7 @@ struct VisualArgs {
 
     /// The Scylla URL
     #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
-    scylla_url: String,
+    scylla_url: Option<String>,
 
     /// The output folder of data (videos, audio, text logs, etc), no trailing slash
     #[arg(short = 'f', long, env = "ODYSSEUS_DAEMON_OUTPUT_FOLDER")]
@@ -148,8 +153,8 @@ async fn main() {
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
     // create wildcard mqtt channel only if logger is enabled
-    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger {
-        let (tx, rx) = mpsc::channel::<playback_data::PlaybackData>(1000);
+    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger || cli.color {
+        let (tx, rx) = broadcast::channel::<playback_data::PlaybackData>(1000);
         (Some(tx), Some(rx))
     } else {
         (None, None)
@@ -176,10 +181,8 @@ async fn main() {
         mute_stat_send,
         mqtt_recv_tx,
         mqtt_sys_tx,
-        MqttProcessorOptions {
-            mqtt_path: cli.mqtt_url,
-            scylla_url: cli.scylla_url,
-        },
+        cli.mqtt_url,
+        cli.scylla_url,
     );
     let (client, eventloop) = AsyncClient::new(opts, 600);
     let client_sharable: Arc<AsyncClient> = Arc::new(client);
@@ -238,7 +241,7 @@ async fn main() {
         info!("Running logger module");
         task_tracker.spawn(logger_manager(
             token.clone(),
-            mqtt_recv_rx.unwrap(),
+            mqtt_recv_rx.as_ref().unwrap().resubscribe(),
             hv_stat_recv.clone(),
         ));
     }
@@ -249,6 +252,11 @@ async fn main() {
             mqtt_sys_rx.unwrap(),
             mqtt_sender_tx,
         ));
+    }
+
+    if cli.color {
+        info!("Running color controller for wheel");
+        task_tracker.spawn(color_controller(token.clone(), mqtt_recv_rx.unwrap()));
     }
 
     task_tracker.close();
