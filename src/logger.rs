@@ -8,13 +8,13 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
-use crate::{playback_data, HVTransition, SAVE_LOCATION};
+use crate::{HVTransition, SAVE_LOCATION, playback_data};
 
 /// runs the mute/unmute functionality
 /// Takes in a receiver of all MQTT messages
 pub async fn logger_manager(
     cancel_token: CancellationToken,
-    mut mqtt_recv_rx: tokio::sync::mpsc::Receiver<playback_data::PlaybackData>,
+    mut mqtt_recv_rx: tokio::sync::broadcast::Receiver<playback_data::PlaybackData>,
     mut hv_stat_recv: tokio::sync::watch::Receiver<HVTransition>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut writer: Option<BufWriter<File>> = None;
@@ -53,15 +53,14 @@ pub async fn logger_manager(
                 }
 
                 match msg  {
-                    Some(msg) => {
-                        if let Some(writ) = writer.as_mut() {
-                            if let Err(err) = writ.write(&msg.write_length_delimited_to_bytes().unwrap()).await {
+                    Ok(msg) => {
+                        if let Some(writ) = writer.as_mut()
+                            && let Err(err) = writ.write(&msg.write_length_delimited_to_bytes().unwrap()).await {
                                 warn!("Could not write to log! {}", err);
                             }
-                        }
                     },
-                    None => {
-                        warn!("Could not receive message!");
+                    Err(err) => {
+                        warn!("Could not receive message: Err: {}", err);
                         continue;
                     }
                 }

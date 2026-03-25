@@ -5,13 +5,14 @@ use std::{
 
 use protobuf::{Message, SpecialFields};
 use rumqttc::v5::{
-    mqttbytes::{
-        v5::{Packet, Publish},
-        QoS,
-    },
     AsyncClient, Event, EventLoop, MqttOptions,
+    mqttbytes::{
+        QoS,
+        v5::{Packet, Publish},
+    },
 };
 use tokio::sync::{
+    broadcast,
     mpsc::{self, Receiver},
     watch::Sender,
 };
@@ -19,8 +20,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
-    playback_data, serverdata, uploader::upload_files, HVTransition, PublishableMessage,
-    HV_EN_TOPIC, MUTE_EN_TOPIC, SAVE_LOCATION, SEND_LOGGER_DATA, SEND_SERIAL_DATA, SEND_VIDEO_DATA,
+    HV_EN_TOPIC, HVTransition, MUTE_EN_TOPIC, PublishableMessage, SAVE_LOCATION, SEND_LOGGER_DATA,
+    SEND_SERIAL_DATA, SEND_VIDEO_DATA, playback_data, serverdata, uploader::upload_files,
 };
 
 /// The chief processor of incoming mqtt data, this handles
@@ -37,17 +38,9 @@ pub struct MqttProcessor {
     hv_stat_send: Sender<HVTransition>,
     augment_hv_on: bool,
     mute_stat_send: Sender<bool>,
-    mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+    mqtt_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
     mqtt_sys_send: Option<mpsc::Sender<Publish>>,
-    opts: MqttProcessorOptions,
-}
-
-/// processor options, these are static immutable settings
-pub struct MqttProcessorOptions {
-    /// URI of the mqtt server
-    pub mqtt_path: String,
-    /// URI of scylla
-    pub scylla_url: String,
+    scylla_url: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -59,9 +52,10 @@ impl MqttProcessor {
         hv_stat_send: Sender<HVTransition>,
         augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
-        mqtt_recv_tx: Option<mpsc::Sender<playback_data::PlaybackData>>,
+        mqtt_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
         mqtt_sys_send: Option<mpsc::Sender<Publish>>,
-        opts: MqttProcessorOptions,
+        mqtt_path: String,
+        scylla_url: Option<String>,
     ) -> (MqttProcessor, MqttOptions) {
         // create the mqtt client and configure it
         let mut mqtt_opts = MqttOptions::new(
@@ -72,8 +66,8 @@ impl MqttProcessor {
                     .expect("Time went backwards")
                     .as_millis()
             ),
-            opts.mqtt_path.split_once(':').expect("Invalid Siren URL").0,
-            opts.mqtt_path
+            mqtt_path.split_once(':').expect("Invalid Siren URL").0,
+            mqtt_path
                 .split_once(':')
                 .unwrap()
                 .1
@@ -96,7 +90,7 @@ impl MqttProcessor {
                 mute_stat_send,
                 mqtt_recv_tx,
                 mqtt_sys_send,
-                opts,
+                scylla_url,
             },
             mqtt_opts,
         )
@@ -159,14 +153,13 @@ impl MqttProcessor {
                             warn!("Could not parse topic, topic: {:?}", msg.topic);
                             continue;
                         };
-                        if let Some(ref sender) = self.mqtt_sys_send {
-                            if topic.starts_with("$SYS") {
+                        if let Some(ref sender) = self.mqtt_sys_send
+                            && topic.starts_with("$SYS") {
                             if let Err(err) = sender.send(msg).await {
                                 warn!("Could not send to SYS processor: {}", err);
                             }
                             continue;
-                            }
-                        };
+                            };
 
 
                         let Ok(res) = serverdata::ServerData::parse_from_bytes(&msg.payload) else {
@@ -208,36 +201,35 @@ impl MqttProcessor {
                                 }
                             },
                             SEND_LOGGER_DATA => {
-                                if !last_stat {
-                                    debug!("Sending Logger Data, {}", val);
+                                if !last_stat && let Some(url) = &self.scylla_url {
+                                    info!("Sending Logger Data, {}", val);
 
-                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, true, false, false);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), url, true, false, false);
                                 }
                             },
                             SEND_SERIAL_DATA => {
-                                if !last_stat {
-                                    debug!("Sending Serial Data, {}", val);
+                                if !last_stat && let Some(url) = &self.scylla_url {
+                                    info!("Sending Serial Data, {}", val);
 
-                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, false, true);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), url, false, false, true);
                                 }
                             },
                             SEND_VIDEO_DATA => {
-                                if !last_stat {
-                                    debug!("Sending Video Data, {}", val);
+                                if !last_stat && let Some(url) = &self.scylla_url {
+                                    info!("Sending Video Data, {}", val);
 
-                                    upload_files(SAVE_LOCATION.get().unwrap(), &self.opts.scylla_url, false, true, false);
+                                    upload_files(SAVE_LOCATION.get().unwrap(), url, false, true, false);
                                 }
                             }
                             _ => {
                             }
                         }
                         // if using it, send all mqtt messages to data logger
-                        if let Some(ref recv) = self.mqtt_recv_tx {
-                            if let Err(err) = recv.send(playback_data::PlaybackData{
-                                topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }).await {
+                        if let Some(ref recv) = self.mqtt_recv_tx
+                            && let Err(err) = recv.send(playback_data::PlaybackData{
+                                topic:topic.to_string(),values:res.values,unit:res.unit,time_us:res.time_us, special_fields: SpecialFields::new() }) {
                                 warn!("Error sending message received! {}", err);
                             }
-                        }
                     }
                     Err(e) => trace!("Recieved error: {}", e),
                     _ => {}
