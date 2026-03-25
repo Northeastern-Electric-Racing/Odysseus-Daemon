@@ -22,16 +22,7 @@ pub async fn network_scraper(
     let mut send_list: Vec<NetMeasurement> = vec![];
 
     for iface in network_ifaces {
-        let path: PathBuf = [
-            "sys".to_string(),
-            "class".to_string(),
-            "net".to_string(),
-            iface.clone(),
-            "statistics".to_string(),
-            "tx_bytes".to_string(),
-        ]
-        .iter()
-        .collect();
+        let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/tx_bytes"));
 
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/tx_bytes"),
@@ -42,16 +33,7 @@ pub async fn network_scraper(
 
         send_list.push((path, msg, Some((Instant::now(), 0f32))));
 
-        let path: PathBuf = [
-            "sys".to_string(),
-            "class".to_string(),
-            "net".to_string(),
-            iface.clone(),
-            "statistics".to_string(),
-            "rx_bytes".to_string(),
-        ]
-        .iter()
-        .collect();
+        let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/rx_bytes"));
 
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/rx_bytes"),
@@ -62,19 +44,10 @@ pub async fn network_scraper(
 
         send_list.push((path, msg, Some((Instant::now(), 0f32))));
 
-        let path: PathBuf = [
-            "sys".to_string(),
-            "class".to_string(),
-            "net".to_string(),
-            iface.clone(),
-            "statistics".to_string(),
-            "tx_bytes".to_string(),
-        ]
-        .iter()
-        .collect();
+        let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/rx_errors"));
 
         let msg = PublishableMessage {
-            topic: format!("{base_name}/{iface}/tx_bytes"),
+            topic: format!("{base_name}/{iface}/rx_errors"),
             data: vec![],
             unit: "bytes/s",
             time: 0,
