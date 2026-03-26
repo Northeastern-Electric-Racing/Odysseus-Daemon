@@ -16,6 +16,7 @@ Modules
 - `audible`: Call feature trigger and monitor.  Status: Alpha
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Incomplete
 - `net`: Network statistics telemetry scraper and sender for both TPU and Base Station. Status: Alpha
+- `halow`: Hardware statistics telemetry scraper and sender for both TPU and Base Station. Status: Alpha
 - `logger`: MQTT receiver and disk logger. Status: Beta
 - `color`: The wheel LED controller and API system. Status: Alpha
 - `daq`: The Jack DAQ serial scraper. Status: Beta

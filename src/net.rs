@@ -18,7 +18,7 @@ pub async fn network_scraper(
     base_name: String,
     network_ifaces: Vec<String>,
 ) {
-    let mut sync_timer = tokio::time::interval(Duration::from_millis(500));
+    let mut sync_timer = tokio::time::interval(Duration::from_millis(250));
     // the main structure of data to mutate
     let mut send_list: Vec<NetMeasurement> = vec![];
 
@@ -78,9 +78,7 @@ async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Er
     for item in send_list.iter_mut() {
         let ok = tokio::fs::read_to_string(item.0.clone()).await?;
         let ok = ok.trim();
-        trace!("Got val {}", ok);
         let res = ok.parse::<u32>().unwrap_or(0);
-        trace!("Got val {}", res);
         item.1.data = if let Some(edit) = item.2.as_mut() {
             let old_time = edit.0;
             edit.0 = Instant::now();

@@ -8,6 +8,7 @@ pub mod color;
 pub mod daq;
 pub mod daq_monitor;
 pub mod gps;
+pub mod halow;
 pub mod lockdown;
 pub mod logger;
 pub mod net;

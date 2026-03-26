@@ -11,6 +11,7 @@ use odysseus_daemon::{
     color::color_controller,
     daq_monitor::monitor_daq,
     gps::gps_manager,
+    halow::halow_scraper,
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::MqttProcessor,
@@ -117,11 +118,19 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_NET_STATS")]
     net: bool,
 
-    /// The internet interfaces to gather statistics from
-    #[arg(long, env = "ODYSSEUS_DAEMON_NET_IFACES")]
-    ifaces: Option<Vec<String>>,
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_HALOW_STATS")]
+    halow: bool,
 
-    /// The base MQTT topic/node name
+    /// The internet interfaces to gather statistics from (for net)
+    #[arg(long, env = "ODYSSEUS_DAEMON_NET_IFACES")]
+    net_ifaces: Option<Vec<String>>,
+
+    /// The Halow interfaces to gather statistics from (for halow)
+    #[arg(long, env = "ODYSSEUS_DAEMON_HW_IFACES", default_value = "wlan0")]
+    hw_iface: String,
+
+    /// The base MQTT topic/node name (for net, halow)
     #[arg(long, env = "ODYSSEUS_DAEMON_BASE_NODE", default_value = "TPU")]
     base_node: String,
 }
@@ -288,15 +297,20 @@ async fn main() {
     }
 
     if cli.net
-        && let Some(ifaces) = cli.ifaces
+        && let Some(ifaces) = cli.net_ifaces
     {
         info!("Running network statistics scraper");
         task_tracker.spawn(network_scraper(
             token.clone(),
-            mqtt_sender_tx,
-            cli.base_node,
+            mqtt_sender_tx.clone(),
+            cli.base_node.clone(),
             ifaces,
         ));
+    }
+
+    if cli.halow {
+        info!("Running halow statistics scraper");
+        task_tracker.spawn(halow_scraper(token.clone(), cli.base_node, mqtt_sender_tx));
     }
 
     task_tracker.close();
