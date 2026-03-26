@@ -32,7 +32,7 @@ pub async fn network_scraper(
             time: 0,
         };
 
-        send_list.push((path, msg, Some((Instant::now(), 0f32))));
+        send_list.push((path, msg, Some((Instant::now(), 0))));
 
         let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/rx_bytes"));
 
@@ -43,7 +43,7 @@ pub async fn network_scraper(
             time: 0,
         };
 
-        send_list.push((path, msg, Some((Instant::now(), 0f32))));
+        send_list.push((path, msg, Some((Instant::now(), 0))));
 
         let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/rx_errors"));
 
