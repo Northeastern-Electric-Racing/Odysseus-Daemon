@@ -77,8 +77,9 @@ pub async fn network_scraper(
 async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Error> {
     for item in send_list.iter_mut() {
         let ok = tokio::fs::read_to_string(item.0.clone()).await?;
+        let ok = ok.trim();
         trace!("Got val {}", ok);
-        let res = ok.parse::<f32>().unwrap_or(0f32);
+        let res = ok.parse::<f32>().unwrap_or(-1f32);
         trace!("Got val {}", res);
         item.1.data = if let Some(edit) = item.2.as_mut() {
             let old_time = edit.0;
