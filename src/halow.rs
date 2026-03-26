@@ -20,8 +20,7 @@ pub async fn halow_scraper(
     let mcs_topic_tx = format!("{base_name}/HaLow/TxMCS");
     let mcs_topic_rx = format!("{base_name}/HaLow/RxMCS");
 
-    let rssi_regex =
-        Regex::new(r"rssi\s*[:=]\s*([-+]?\d+(?:\.\d+)?)").expect("Invalid halow regex rssi");
+    let rssi_regex = Regex::new(r"rssi\s*:\s*(-?\d+)").expect("Invalid halow regex rssi");
 
     loop {
         tokio::select! {
@@ -80,7 +79,7 @@ async fn handle_tick(
             && let Ok(res) = r.to_string().parse::<f32>()
         {
             send.push(PublishableMessage {
-                topic: mcs_topic_tx.clone(),
+                topic: mcs_topic_rx.clone(),
                 data: vec![res],
                 unit: "",
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
@@ -91,7 +90,7 @@ async fn handle_tick(
             && let Ok(res) = r.to_string().parse::<f32>()
         {
             send.push(PublishableMessage {
-                topic: mcs_topic_rx.to_string(),
+                topic: mcs_topic_tx.to_string(),
                 data: vec![res],
                 unit: "",
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
