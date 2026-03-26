@@ -1,4 +1,5 @@
 use std::{path::PathBuf, time::Duration, time::UNIX_EPOCH};
+use tracing::trace;
 
 use tokio::{sync::mpsc::Sender, time::Instant};
 use tokio_util::sync::CancellationToken;
@@ -76,12 +77,18 @@ pub async fn network_scraper(
 async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Error> {
     for item in send_list.iter_mut() {
         let ok = tokio::fs::read_to_string(item.0.clone()).await?;
+        trace!("Got val {}", ok);
         let res = ok.parse::<f32>().unwrap_or(0f32);
+        trace!("Got val {}", res);
         item.1.data = if let Some(edit) = item.2.as_mut() {
             let old_time = edit.0;
             edit.0 = Instant::now();
             let old = edit.1;
             edit.1 = res;
+            trace!(
+                "Debug write {} - {} / {:?} - {:?}",
+                edit.1, old, edit.0, old_time
+            );
             vec![(edit.1 - old) / (edit.0 - old_time).as_secs() as f32]
         } else {
             vec![res]
