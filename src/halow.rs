@@ -49,8 +49,8 @@ async fn handle_tick(
         .await
         .expect("Failed to run cli_app for halow");
     if let Ok(st) = str::from_utf8(&output.stdout)
-        && let Some(caps) = rssi_regex.find(st)
-        && let Ok(fl) = caps.as_str().trim().parse::<f32>()
+        && let Some(caps) = rssi_regex.captures(st)
+        && let Ok(fl) = caps[1].trim().parse::<f32>()
     {
         send.push(PublishableMessage {
             topic: rssi_topic.clone(),
