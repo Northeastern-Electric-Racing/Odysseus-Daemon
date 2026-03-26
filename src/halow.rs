@@ -60,7 +60,10 @@ async fn handle_tick(
             time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
         })
     } else {
-        warn!("Could not get RSSI from {:?}", output.stdout);
+        warn!(
+            "Could not get RSSI from {:?}",
+            str::from_utf8(&output.stdout)
+        );
     }
 
     let output = Command::new("cli_app")
