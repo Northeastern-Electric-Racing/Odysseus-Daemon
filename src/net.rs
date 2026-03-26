@@ -10,7 +10,7 @@ use crate::PublishableMessage;
 /// The path of the measurement in sysfs
 /// the message to publish
 /// the last instant and value it was measured, or None if its a simple read
-type NetMeasurement = (PathBuf, PublishableMessage, Option<(Instant, f32)>);
+type NetMeasurement = (PathBuf, PublishableMessage, Option<(Instant, u32)>);
 
 pub async fn network_scraper(
     cancel_token: CancellationToken,
@@ -79,7 +79,7 @@ async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Er
         let ok = tokio::fs::read_to_string(item.0.clone()).await?;
         let ok = ok.trim();
         trace!("Got val {}", ok);
-        let res = ok.parse::<f32>().unwrap_or(-1f32);
+        let res = ok.parse::<u32>().unwrap_or(0);
         trace!("Got val {}", res);
         item.1.data = if let Some(edit) = item.2.as_mut() {
             let old_time = edit.0;
@@ -90,9 +90,9 @@ async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Er
                 "Debug write {} - {} / {:?} - {:?}",
                 edit.1, old, edit.0, old_time
             );
-            vec![(edit.1 - old) / (edit.0 - old_time).as_secs() as f32]
+            vec![((edit.1 - old) / (edit.0 - old_time).as_secs() as u32) as f32]
         } else {
-            vec![res]
+            vec![res as f32]
         };
         item.1.time = UNIX_EPOCH.elapsed().unwrap().as_micros() as u64;
     }
