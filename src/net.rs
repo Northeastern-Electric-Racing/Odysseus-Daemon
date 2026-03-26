@@ -90,7 +90,7 @@ async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Er
                 "Debug write {} - {} / {:?} - {:?}",
                 edit.1, old, edit.0, old_time
             );
-            vec![((edit.1 - old) / (edit.0 - old_time).as_secs() as u32) as f32]
+            vec![((edit.1 - old) as f32 / (edit.0 - old_time).as_secs_f32())]
         } else {
             vec![res as f32]
         };
