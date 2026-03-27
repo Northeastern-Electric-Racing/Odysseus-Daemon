@@ -146,10 +146,10 @@ async fn send_gps_data(
     }
 }
 
-const MODE: &str = "TPU/GPS2/Mode";
-const SPEED: &str = "TPU/GPS2/GroundSpeed";
-const COORDS: &str = "TPU/GPS2/Location";
-const ALT: &str = "TPU/GPS2/Altitude";
+const MODE: &str = "TPU/GPS/Mode";
+const SPEED: &str = "TPU/GPS/GroundSpeed";
+const COORDS: &str = "TPU/GPS/Location";
+const ALT: &str = "TPU/GPS/Altitude";
 fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
     let mut ret = vec![];
 
