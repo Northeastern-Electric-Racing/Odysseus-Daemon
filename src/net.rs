@@ -50,7 +50,18 @@ pub async fn network_scraper(
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/rx_errors"),
             data: vec![],
-            unit: "bytes/s",
+            unit: "bytes",
+            time: 0,
+        };
+
+        send_list.push((path, msg, None));
+
+        let path: PathBuf = PathBuf::from(format!("/sys/class/net/{iface}/statistics/tx_errors"));
+
+        let msg = PublishableMessage {
+            topic: format!("{base_name}/{iface}/tx_errors"),
+            data: vec![],
+            unit: "bytes",
             time: 0,
         };
 

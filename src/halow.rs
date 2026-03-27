@@ -21,6 +21,8 @@ pub async fn halow_scraper(
     let mcs_topic_rx = format!("{base_name}/HaLow/RxMCS");
 
     let rssi_regex = Regex::new(r"rssi\s*:\s*(-?\d+)").expect("Invalid halow regex rssi");
+    let mcs_regex =
+        Regex::new(r"\(MCS\s*(\d+)\).*?\(MCS\s*(\d+)\)").expect("Invalid halow regex MCS");
 
     loop {
         tokio::select! {
@@ -29,7 +31,7 @@ pub async fn halow_scraper(
                 break;
             },
             _ =  signal_sync.tick() => {
-                let msgs = handle_tick(&rssi_regex, rssi_topic.clone(), mcs_topic_tx.clone(), mcs_topic_rx.clone()).await;
+                let msgs = handle_tick(&rssi_regex, &mcs_regex, rssi_topic.clone(), mcs_topic_tx.clone(), mcs_topic_rx.clone()).await;
                 handle_sends(msgs, &mqtt_sender_tx).await;
             }
         }
@@ -38,6 +40,7 @@ pub async fn halow_scraper(
 
 async fn handle_tick(
     rssi_regex: &Regex,
+    mcs_regex: &Regex,
     rssi_topic: String,
     mcs_topic_tx: String,
     mcs_topic_rx: String,
@@ -73,25 +76,25 @@ async fn handle_tick(
 
     if let Ok(st) = str::from_utf8(&output.stdout)
         && let Some(res) = st.lines().nth(2)
+        && let Some(caps) = mcs_regex.captures(res)
     {
-        if let Some(l) = res.split_ascii_whitespace().nth(5)
-            && let Some(r) = l.chars().rev().nth(1)
-            && let Ok(res) = r.to_string().parse::<f32>()
+        if let Some(res) = caps.get(1)
+            && let Ok(fl) = res.as_str().parse::<f32>()
         {
             send.push(PublishableMessage {
                 topic: mcs_topic_rx.clone(),
-                data: vec![res],
+                data: vec![fl],
                 unit: "",
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
-            })
+            });
         }
-        if let Some(l) = res.split_ascii_whitespace().nth(3)
-            && let Some(r) = l.chars().rev().nth(1)
-            && let Ok(res) = r.to_string().parse::<f32>()
+
+        if let Some(res) = caps.get(2)
+            && let Ok(fl) = res.as_str().parse::<f32>()
         {
             send.push(PublishableMessage {
                 topic: mcs_topic_tx.to_string(),
-                data: vec![res],
+                data: vec![fl],
                 unit: "",
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
             })
