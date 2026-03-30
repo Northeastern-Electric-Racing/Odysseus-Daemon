@@ -543,6 +543,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpsd_proto"
+version = "1.0.0"
+source = "git+https://github.com/Northeastern-Electric-Racing/gpsd_proto.git#bbd9e1da68335dd4ee4d7359f5ea57bdc4b7f220"
+dependencies = [
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1211,6 +1222,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
+ "futures-util",
+ "gpsd_proto",
  "heapless",
  "palette",
  "protobuf",
@@ -1224,6 +1237,7 @@ dependencies = [
  "sysinfo",
  "tokio",
  "tokio-serial",
+ "tokio-stream",
  "tokio-util",
  "tracing",
  "tracing-subscriber",

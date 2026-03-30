@@ -7,12 +7,16 @@ use clap::Parser;
 use odysseus_daemon::{
     HVTransition, PublishableMessage, SAVE_LOCATION,
     audible::audible_manager,
+    can::can_data_scraper,
     can_handler::can_handler,
     color::color_controller,
     daq_monitor::monitor_daq,
+    gps::gps_manager,
+    halow::halow_scraper,
     lockdown::lockdown_runner,
     logger::logger_manager,
     mqtt_handler::MqttProcessor,
+    net::network_scraper,
     numerical::collect_data,
     playback_data,
     sys_parser::sys_parser,
@@ -99,8 +103,41 @@ struct VisualArgs {
     output_folder: String,
 
     /// The SocketCAN interface port
-    #[arg(short = 'c', long, env = "SOCKETCAN_IFACE", default_value = "can0")]
+    #[arg(
+        short = 'c',
+        long,
+        env = "ODYSSEUS_DAEMON_SOCKETCAN_IFACE",
+        default_value = "vcan0"
+    )]
     socketcan_iface: String,
+
+    /// Whether to enable the GPS module
+    #[arg(long, env = "ODYSSEUS_DAEMON_GPS")]
+    gps: bool,
+
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_NET_STATS")]
+    net: bool,
+
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_HALOW_STATS")]
+    halow: bool,
+
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_CAN_STATS")]
+    can: bool,
+
+    /// The internet interfaces to gather statistics from (for net)
+    #[arg(long, env = "ODYSSEUS_DAEMON_NET_IFACES")]
+    net_ifaces: Option<Vec<String>>,
+
+    /// The Halow interfaces to gather statistics from (for halow)
+    #[arg(long, env = "ODYSSEUS_DAEMON_HW_IFACES", default_value = "wlan0")]
+    hw_iface: String,
+
+    /// The base MQTT topic/node name (for net, halow)
+    #[arg(long, env = "ODYSSEUS_DAEMON_BASE_NODE", default_value = "TPU")]
+    base_node: String,
 }
 
 /// Folder hierarchy
@@ -193,7 +230,7 @@ async fn main() {
     info!("Enable CAN handler");
     task_tracker.spawn(can_handler(
         token.clone(),
-        cli.socketcan_iface,
+        cli.socketcan_iface.clone(),
         can_handler_rx,
     ));
 
@@ -250,13 +287,49 @@ async fn main() {
         task_tracker.spawn(sys_parser(
             token.clone(),
             mqtt_sys_rx.unwrap(),
-            mqtt_sender_tx,
+            mqtt_sender_tx.clone(),
         ));
+    }
+
+    if cli.gps {
+        info!("Running GPS Manager");
+        task_tracker.spawn(gps_manager(token.clone(), mqtt_sender_tx.clone()));
     }
 
     if cli.color {
         info!("Running color controller for wheel");
         task_tracker.spawn(color_controller(token.clone(), mqtt_recv_rx.unwrap()));
+    }
+
+    if cli.net
+        && let Some(ifaces) = cli.net_ifaces
+    {
+        info!("Running network statistics scraper");
+        task_tracker.spawn(network_scraper(
+            token.clone(),
+            mqtt_sender_tx.clone(),
+            cli.base_node.clone(),
+            ifaces,
+        ));
+    }
+
+    if cli.halow {
+        info!("Running halow statistics scraper");
+        task_tracker.spawn(halow_scraper(
+            token.clone(),
+            cli.base_node.clone(),
+            mqtt_sender_tx.clone(),
+        ));
+    }
+
+    if cli.can {
+        info!("Running CAN statistics scraper");
+        task_tracker.spawn(can_data_scraper(
+            token.clone(),
+            mqtt_sender_tx,
+            cli.base_node,
+            cli.socketcan_iface,
+        ));
     }
 
     task_tracker.close();

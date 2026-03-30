@@ -3,12 +3,16 @@ pub mod uploader;
 
 // MODULES
 pub mod audible;
+pub mod can;
 pub mod can_handler;
 pub mod color;
 pub mod daq;
 pub mod daq_monitor;
+pub mod gps;
+pub mod halow;
 pub mod lockdown;
 pub mod logger;
+pub mod net;
 pub mod numerical;
 pub mod sys_parser;
 pub mod visual;
@@ -18,7 +22,7 @@ pub mod playback_data;
 pub mod serverdata;
 
 /// A message to be sent
-#[derive(std::fmt::Debug)]
+#[derive(std::fmt::Debug, Clone)]
 pub struct PublishableMessage {
     pub topic: String,
     pub data: Vec<f32>,
