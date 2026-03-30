@@ -7,6 +7,7 @@ use clap::Parser;
 use odysseus_daemon::{
     HVTransition, PublishableMessage, SAVE_LOCATION,
     audible::audible_manager,
+    can::can_data_scraper,
     can_handler::can_handler,
     color::color_controller,
     daq_monitor::monitor_daq,
@@ -122,6 +123,10 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_HALOW_STATS")]
     halow: bool,
 
+    /// Whether to enable the Network statistics module
+    #[arg(long, env = "ODYSSEUS_DAEMON_CAN_STATS")]
+    can: bool,
+
     /// The internet interfaces to gather statistics from (for net)
     #[arg(long, env = "ODYSSEUS_DAEMON_NET_IFACES")]
     net_ifaces: Option<Vec<String>>,
@@ -225,7 +230,7 @@ async fn main() {
     info!("Enable CAN handler");
     task_tracker.spawn(can_handler(
         token.clone(),
-        cli.socketcan_iface,
+        cli.socketcan_iface.clone(),
         can_handler_rx,
     ));
 
@@ -310,7 +315,21 @@ async fn main() {
 
     if cli.halow {
         info!("Running halow statistics scraper");
-        task_tracker.spawn(halow_scraper(token.clone(), cli.base_node, mqtt_sender_tx));
+        task_tracker.spawn(halow_scraper(
+            token.clone(),
+            cli.base_node.clone(),
+            mqtt_sender_tx.clone(),
+        ));
+    }
+
+    if cli.can {
+        info!("Running CAN statistics scraper");
+        task_tracker.spawn(can_data_scraper(
+            token.clone(),
+            mqtt_sender_tx,
+            cli.base_node,
+            cli.socketcan_iface,
+        ));
     }
 
     task_tracker.close();

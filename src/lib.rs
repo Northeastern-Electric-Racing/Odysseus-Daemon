@@ -3,6 +3,7 @@ pub mod uploader;
 
 // MODULES
 pub mod audible;
+pub mod can;
 pub mod can_handler;
 pub mod color;
 pub mod daq;

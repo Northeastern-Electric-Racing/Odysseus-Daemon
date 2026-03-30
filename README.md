@@ -20,6 +20,7 @@ Modules
 - `logger`: MQTT receiver and disk logger. Status: Beta
 - `color`: The wheel LED controller and API system. Status: Alpha
 - `daq`: The Jack DAQ serial scraper. Status: Beta
+- `can`: Diagnostics for the CANbus interface.  Status: Alpha
 
 Upload modules:
 - `logger`: Upload from the logger module to scylla. Status: Beta
