@@ -42,8 +42,8 @@ pub struct HVOnData {
     pub time_ms: u64,
 }
 
-/// the topic to listen for for HV enable, 1 is on 0 is off
-pub const HV_EN_TOPIC: &str = "VCU/State/TSMS";
+/// the topic to listen for for HV enable, 1 is off and 0 is on
+pub const HV_EN_TOPIC: &str = "BMS/shutdown/state";
 
 /// the topic to listen for mute enable, 1 is on 0 is off
 pub const MUTE_EN_TOPIC: &str = "WHEEL/Buttons/Mute";
