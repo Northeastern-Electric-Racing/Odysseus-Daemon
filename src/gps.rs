@@ -191,7 +191,7 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
     ret
 }
 
-const PPS: &str = "TPU/GPS2/PPS";
+const PPS: &str = "TPU/GPS/PPS";
 fn parse_pps(pps: Pps, time: u64) -> Vec<PublishableMessage> {
     if let Some(pps_precision) = pps.precision {
         vec![PublishableMessage {
