@@ -25,9 +25,7 @@ pub async fn collect_data(
         "Found these components to monitor with numerical: {:?}",
         components
     );
-    let mut temperature_component = components
-        .iter_mut()
-        .find(|x| x.label() == "coretemp Core 0");
+    let mut temperature_component = components.iter_mut().find(|x| x.temperature().is_some());
 
     // for broker CPU
     let mut pid = match fs::read_to_string("/var/run/mosquitto.pid") {
