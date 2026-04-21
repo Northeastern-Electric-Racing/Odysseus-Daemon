@@ -21,6 +21,10 @@ pub async fn collect_data(
 
     // for CPU temp
     let mut components = Components::new_with_refreshed_list();
+    debug!(
+        "Found these components to monitor with numerical: {:?}",
+        components
+    );
     let mut temperature_component = components
         .iter_mut()
         .find(|x| x.label() == "coretemp Core 0");
