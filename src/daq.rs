@@ -1,3 +1,13 @@
+//! Recieves, parses, and sends data from the Jack DAQ, accompanies daq_monitor
+//!
+//! Beta/buggy/unused
+//!
+//! Requires:
+//!  - Sending data over MQTT
+//!  - Sending data over CAN bus
+//!
+//!
+
 use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::{

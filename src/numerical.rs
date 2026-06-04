@@ -1,3 +1,13 @@
+//! Sends hardware property data over MQTT.
+//!
+//! Beta
+//!
+//! Requires:
+//!  - `/var/run/mosquitto.pid` to contain valid pid
+//!  - CPU temperature available
+//!
+//! Will fallback if any hardware is unavailable, so should not critically fail.
+
 use std::{
     fs,
     time::{Duration, UNIX_EPOCH},

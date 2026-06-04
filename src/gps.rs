@@ -1,3 +1,11 @@
+//! A GPS data scraper, using the GPSd TCP protocol.
+//!
+//! Beta
+//!
+//! Requires:
+//!  - Sending MQTT messages
+//!  - A GPSd instance running at default port
+
 use std::{error::Error, time::UNIX_EPOCH};
 
 use futures_util::SinkExt;

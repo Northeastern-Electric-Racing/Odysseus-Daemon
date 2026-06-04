@@ -1,3 +1,11 @@
+//! Denies access to the serial devices from USBIP, and captures serial stdout
+//!
+//! Alpha/unused/buggy
+//!
+//! Requires:
+//!  - `usbip`
+//!  - Getting HV topic signal
+//!  - `/dev/ttyCerberus` and `/dev/ttyShepherd`
 use std::{error::Error, process::Stdio, time::Duration};
 
 use tokio::{

@@ -1,3 +1,10 @@
+//! Scrape network statistics per iface.
+//!
+//! Beta
+//!
+//! Requires:
+//!  - SYSFS for given iface
+
 use std::{path::PathBuf, time::Duration, time::UNIX_EPOCH};
 use tracing::trace;
 

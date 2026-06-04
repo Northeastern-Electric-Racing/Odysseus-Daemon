@@ -1,3 +1,11 @@
+//! Parses the $SYS hierarchy and forwards it to $SYS
+//!
+//! Beta/buggy
+//!
+//! Requires:
+//!  - Receive $SYS MQTT only
+//!  - Send MQTT
+
 use std::time::UNIX_EPOCH;
 
 use regex::Regex;
