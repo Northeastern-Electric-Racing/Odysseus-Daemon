@@ -1,3 +1,8 @@
+//! Diagnostic data for the can interface.
+//! Requires:
+//!  - MQTT sending
+//!  - `canbusload`
+
 use std::process::Stdio;
 use std::time::UNIX_EPOCH;
 

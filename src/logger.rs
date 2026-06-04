@@ -1,3 +1,14 @@
+//! Plaintext data logger using length prepended protobuf.
+//! It creates a file upon HV going on, and writes all topics to it.
+//! This file can then be uploaded with the uploader binary included.
+//!
+//! Beta, well tested
+//!
+//! Requires:
+//!  - All MQTT messages
+//!  - Getting HV topic signal
+//!
+
 use std::error::Error;
 
 use protobuf::Message;

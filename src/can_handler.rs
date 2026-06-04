@@ -1,3 +1,6 @@
+//! HELPER: Sends CAN messages
+//! Unused
+
 use tokio::sync::mpsc::Receiver;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};

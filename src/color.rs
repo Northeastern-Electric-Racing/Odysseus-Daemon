@@ -1,11 +1,27 @@
+//! Controls the LEDs on the Steering Wheel.
+//!
+//! This module is written to optimize speed of translate colorspace and
+//! write colorspace functions so they are as efficient as possible.
+//!
+//! Requires:
+//!  - Getting LED topic signal
+//!  - SYSFS interface for LEDs as configured in Odysseus
+//!
+//! Adding a new LED mode:
+//! 1. Add it to `WheelMode`
+//! 2. Add it to match in from_settings to give it an official index
+//! 3. Add persistent variables you need to access when coding it to a
+//!    <Name>Vars variable.  Make sure to derive or impl Default and Debug
+//! 4. Code the actual logic in the match in `calculate_settings`
+//!
+//! Adding a new follower (so the lights follow a specific pattern)
+//! 1. Add it to `FollowerItemSettings::from_idex`
+
 use palette::{Hsv, IntoColor, LinSrgb, RgbHue, Srgb};
 use std::fmt::Debug;
 use std::time::Duration;
 use std::{array, path::PathBuf, str::FromStr};
 
-/**
- * This module is written to optimize speed of translate colorspace and write colorspace functions so they are as efficient as possible.
- */
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace, warn};
@@ -23,16 +39,6 @@ const CALC_CYCLE_TIME: Duration = Duration::from_millis(10);
 type WheelColor = Hsv<palette::encoding::Srgb, f32>;
 /// the array of colors to make each LED in the banl
 type Settings = [WheelColor; LED_BANK_SIZE_REAL];
-
-/// ------ README: Adding a new mode
-/// 1. Add it to WheelMode
-/// 2. Add it to match in from_settings to give it an official index
-/// 3. Add persistent variables you need to access when coding it to a <Name>Vars variable.  Make sure to derive or impl Default and Debug
-/// 4. Code the actual logic in the match in calculate_settings
-///
-///
-/// ----- README: Adding a new follower (follower mode edit, so the lights follow a specific pattern)
-/// 1. Add it to FollowerItemSettings::from_idex()
 
 #[derive(Default, Debug)]
 struct StartupVars {
@@ -179,10 +185,8 @@ const LED_BANK_WRITE_LISTINGS: [(&str, usize); LED_BANK_SIZE_FUCKED] = [
     ("/sys/class/leds/m7:8/", 2),
 ];
 
-/**
- * Translates the color space into a tuple of colors to our fucked up mapping
- * (see altium schematic, table 7-1 on LP5018 PDF, and lp5018a.dts on Odysseus)
- */
+/// Translates the color space into a tuple of colors to our fucked up mapping
+/// (see altium schematic, table 7-1 on LP5018 PDF, and lp5018a.dts on Odysseus)
 fn translate_colorspace(
     data: [(u8, u8, u8); LED_BANK_SIZE_REAL],
 ) -> Result<[heapless::String<10>; LED_BANK_SIZE_FUCKED], heapless::CapacityError> {
@@ -205,9 +209,7 @@ fn translate_colorspace(
     Ok(ret)
 }
 
-/**
- * Writes the data to the given paths
- */
+/// Writes the data to the given paths
 async fn write_paths(
     data: [heapless::String<10>; LED_BANK_SIZE_FUCKED],
     path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED],
@@ -220,9 +222,8 @@ async fn write_paths(
     }
 }
 
-/**
- * Writes to the path given a identical value for each and every path.  Useful for setting brightness
- */
+/// Writes to the path given a identical value for each and every path.
+/// Useful for setting brightness
 async fn execute_brightness_step(brightness: u8, path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED]) {
     write_paths(
         // TODO replace with array::repeat
@@ -232,9 +233,8 @@ async fn execute_brightness_step(brightness: u8, path_cache: &[PathBuf; LED_BANK
     .await;
 }
 
-/**
- * Runs a "tick" at which all of the LED settings are asynchronously converted to RGB and sent
- */
+/// Runs a "tick" at which all of the LED settings are
+/// asynchronously converted to RGB and sent
 async fn execute_step(settings: Settings, path_cache: &[PathBuf; LED_BANK_SIZE_FUCKED]) {
     let Ok(res) = translate_colorspace(settings.map(|f| {
         let srgb: Srgb<f32> = f.into_color();
@@ -248,10 +248,10 @@ async fn execute_step(settings: Settings, path_cache: &[PathBuf; LED_BANK_SIZE_F
     write_paths(res, path_cache).await;
 }
 
-/*
- * Uses the current mode to calculate the current LED conditions and returns them
- * Returns None of no settings changes are required
- */
+/// Uses the current mode to calculate the current LED conditions and
+/// returns them.
+///
+/// Returns None of no settings changes are required
 fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<Settings> {
     match mode {
         WheelMode::Startup(startup_vars) => {
@@ -346,10 +346,10 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
     }
 }
 
-/*
- * Handle recieving a MQTT message, which could either do nothing or mutate the brightness or mode
- * Returns whether existing settings should be reset
- */
+/// Handle recieving a MQTT message, which could either do nothing or
+/// mutate the brightness or mode.
+///
+/// Returns whether existing settings should be reset
 fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) -> bool {
     // handle following
     match mode {

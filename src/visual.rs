@@ -1,3 +1,11 @@
+//! Transcode and store video data
+//!
+//! Alpha/unused
+//!
+//! Requires:
+//!  - `ffmpeg`
+//!
+
 use std::{error::Error, process::Stdio, time::Duration};
 
 use tokio::{

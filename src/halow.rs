@@ -1,3 +1,11 @@
+//! A Newracom/Halow data scraper.
+//!
+//! Beta
+//!
+//! Requires:
+//!  - `cli_app`
+//!
+
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 

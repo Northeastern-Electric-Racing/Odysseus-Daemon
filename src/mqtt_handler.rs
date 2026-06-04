@@ -1,3 +1,5 @@
+//! HELPER: Receive and send MQTT
+
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},

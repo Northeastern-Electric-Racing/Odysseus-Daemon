@@ -1,3 +1,8 @@
+//! The Jack DAQ is prone to freezing, partially due to MQTT issues,
+//! but mostly serial piping.  Hence this module wrapping it.
+//!
+//! See daq
+
 use socketcan::CanFrame;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
@@ -10,10 +15,6 @@ use crate::daq::collect_daq;
 
 use std::time::Duration;
 
-/**
- * The Jack DAQ is prone to freezing, partially due to MQTT issues, but mostly serial piping
- * This code is not production quality as Jack DAQ is not to be used at competition
- */
 pub async fn monitor_daq(
     cancel_token: CancellationToken,
     device: String,

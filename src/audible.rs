@@ -1,3 +1,9 @@
+//! Controller of the linphone daemon for mute/unmute.
+//! Alpha/untested/unused
+//! Requires
+//!  - Getting mute status topic signal
+//!  - `linphonecsh`
+
 use std::error::Error;
 
 use tokio::{process::Command, sync::watch::Receiver};
