@@ -174,7 +174,7 @@ impl MqttProcessor {
                             HV_EN_TOPIC => {
                                 if !self.augment_hv_on {
                                     // ensure only triggering upon change from previous loop
-                                 if val == 1 && !last_stat {
+                                    if val == 1 && !last_stat {
                                         debug!("Transitioning states to HV on, creating folder!");
                                         if let Err(err) = std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), res.time_us / 1000)) {
                                             warn!("Could not create folder for data, bailing out of this loop! {}", err);
