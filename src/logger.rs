@@ -12,12 +12,13 @@
 use std::error::Error;
 
 use protobuf::Message;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::{
     fs::File,
     io::{AsyncWriteExt, BufWriter},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{HVTransition, SAVE_LOCATION, playback_data};
 
@@ -29,6 +30,15 @@ pub async fn logger_manager(
     mut hv_stat_recv: tokio::sync::watch::Receiver<HVTransition>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut writer: Option<BufWriter<File>> = None;
+
+    // time is wrong for a while upon boot.  hold on until it is OK
+    while !SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .is_ok_and(|time| time > Duration::from_millis(1730247194876))
+    {
+        info!("Waiting for good time");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
     loop {
         tokio::select! {

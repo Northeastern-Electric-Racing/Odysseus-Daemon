@@ -79,9 +79,8 @@ impl MqttProcessor {
         mqtt_opts
             .set_keep_alive(Duration::from_secs(20))
             .set_clean_start(false)
-            .set_connection_timeout(3)
-            //       .set_session_expiry_interval(Some(u32::MAX))
-            .set_topic_alias_max(Some(600));
+            .set_connection_timeout(3);
+        //       .set_session_expiry_interval(Some(u32::MAX))
 
         (
             MqttProcessor {
@@ -174,7 +173,7 @@ impl MqttProcessor {
                             HV_EN_TOPIC => {
                                 if !self.augment_hv_on {
                                     // ensure only triggering upon change from previous loop
-                                 if val == 1 && !last_stat {
+                                    if val == 1 && !last_stat {
                                         debug!("Transitioning states to HV on, creating folder!");
                                         if let Err(err) = std::fs::create_dir(format!("{}/event-{}", SAVE_LOCATION.get().unwrap(), res.time_us / 1000)) {
                                             warn!("Could not create folder for data, bailing out of this loop! {}", err);

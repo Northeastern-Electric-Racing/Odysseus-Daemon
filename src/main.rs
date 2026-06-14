@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::sync::Arc;
 
 use clap::Parser;
 use odysseus_daemon::{
@@ -199,15 +196,6 @@ async fn main() {
 
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
-
-    // time is wrong for a while upon boot.  hold on until it is OK
-    while !SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .is_ok_and(|time| time > Duration::from_millis(1730247194876))
-    {
-        info!("Waiting for good time");
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
 
     info!("Running MQTT processor");
     let (recv, opts) = MqttProcessor::new(
