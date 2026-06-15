@@ -2015,9 +2015,9 @@ dependencies = [
 
 [[package]]
 name = "socketcan"
-version = "3.5.0"
+version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7654092b2859221c29ac4b43dc502a8e156a7f2533e8617aaaa056b664d1230e"
+checksum = "f5e63effc7e77256358f700e5fb0160238501022fec00b75d5da03e9e385d932"
 dependencies = [
  "bitflags 2.12.1",
  "embedded-can",
