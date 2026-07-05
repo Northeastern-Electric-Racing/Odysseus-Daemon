@@ -73,7 +73,7 @@ async fn get_stats(
         ret.push(PublishableMessage {
             topic: frames_topic.to_string(),
             data: vec![fl],
-            unit: "frames/s",
+            unit: "frames/s".to_string(),
             time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
         });
     }
@@ -83,7 +83,7 @@ async fn get_stats(
         ret.push(PublishableMessage {
             topic: bits_topic.to_string(),
             data: vec![fl],
-            unit: "bits/s",
+            unit: "bits/s".to_string(),
             time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
         });
     }
@@ -93,7 +93,7 @@ async fn get_stats(
             ret.push(PublishableMessage {
                 topic: util_topc.to_string(),
                 data: vec![fl / 100f32],
-                unit: "%",
+                unit: "%".to_string(),
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
             });
         }

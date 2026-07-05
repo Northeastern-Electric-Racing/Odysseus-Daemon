@@ -17,6 +17,7 @@ pub mod net;
 pub mod numerical;
 pub mod sys_parser;
 pub mod visual;
+pub mod zenoh_bridge;
 
 // PROTOBUF
 pub mod playback_data;
@@ -27,7 +28,7 @@ pub mod serverdata;
 pub struct PublishableMessage {
     pub topic: String,
     pub data: Vec<f32>,
-    pub unit: &'static str,
+    pub unit: String,
     pub time: u64,
 }
 

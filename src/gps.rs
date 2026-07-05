@@ -164,7 +164,7 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
     ret.push(PublishableMessage {
         topic: MODE.to_string(),
         data: vec![tpv.mode as usize as f32],
-        unit: "enum",
+        unit: "enum".to_string(),
         time,
     });
 
@@ -172,7 +172,7 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
         ret.push(PublishableMessage {
             topic: SPEED.to_string(),
             data: vec![tpv_speed],
-            unit: "knot",
+            unit: "knot".to_string(),
             time,
         });
     }
@@ -183,7 +183,7 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
         ret.push(PublishableMessage {
             topic: COORDS.to_string(),
             data: vec![lat as f32, lon as f32],
-            unit: "coordinate",
+            unit: "coordinate".to_string(),
             time,
         });
     }
@@ -192,7 +192,7 @@ fn parse_tpv(tpv: Tpv, time: u64) -> Vec<PublishableMessage> {
         ret.push(PublishableMessage {
             topic: ALT.to_string(),
             data: vec![tpv_alt_hae],
-            unit: "meter",
+            unit: "meter".to_string(),
             time,
         });
     }
@@ -205,7 +205,7 @@ fn parse_pps(pps: Pps, time: u64) -> Vec<PublishableMessage> {
         vec![PublishableMessage {
             topic: PPS.to_string(),
             data: vec![pps_precision],
-            unit: "NTP precison",
+            unit: "NTP precison".to_string(),
             time,
         }]
     } else {
