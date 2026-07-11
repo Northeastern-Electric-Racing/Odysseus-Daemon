@@ -19,6 +19,7 @@ use odysseus_daemon::{
     sys_parser::sys_parser,
     visual::{SavePipelineOpts, run_save_pipeline},
     zenoh_bridge::{zenoh_fwd, zenoh_rev},
+    zenoh_handler::ZenohProcessor,
 };
 use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
@@ -93,6 +94,15 @@ struct VisualArgs {
         env = "ODYSSEUS_DAEMON_SIREN_URL"
     )]
     mqtt_url: String,
+
+    /// Use Zenoh instead of MQTT -- will eventually become default
+    #[arg(
+        short = 'z',
+        long,
+        default_value = "localhost:1883",
+        env = "ODYSSEUS_DAEMON_ZENOH"
+    )]
+    zenoh: bool,
 
     /// The Scylla URL
     #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
@@ -216,21 +226,38 @@ async fn main() {
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    info!("Running MQTT processor");
-    let (recv, opts) = MqttProcessor::new(
-        token.clone(),
-        mqtt_sender_rx,
-        hv_stat_send,
-        cli.mock,
-        mute_stat_send,
-        mqtt_recv_tx,
-        mqtt_sys_tx,
-        cli.mqtt_url,
-        cli.scylla_url,
-    );
-    let (client, eventloop) = AsyncClient::new(opts, 600);
-    let client_sharable: Arc<AsyncClient> = Arc::new(client);
-    task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
+    if cli.zenoh {
+        info!("Running zenoh processor");
+        let processor = ZenohProcessor::new(
+            token.clone(),
+            mqtt_sender_rx,
+            hv_stat_send,
+            cli.mock,
+            mute_stat_send,
+            mqtt_recv_tx,
+            cli.zenoh_conf.clone(),
+            cli.scylla_url,
+        )
+        .await;
+        task_tracker.spawn(processor.process_zenoh());
+    } else {
+        info!("Running MQTT processor");
+        let (recv, opts) = MqttProcessor::new(
+            token.clone(),
+            mqtt_sender_rx,
+            hv_stat_send,
+            cli.mock,
+            mute_stat_send,
+            mqtt_recv_tx,
+            mqtt_sys_tx,
+            cli.mqtt_url,
+            cli.scylla_url,
+        );
+
+        let (client, eventloop) = AsyncClient::new(opts, 600);
+        let client_sharable: Arc<AsyncClient> = Arc::new(client);
+        task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
+    }
 
     // TASK SPAWNING
 

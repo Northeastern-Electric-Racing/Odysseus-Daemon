@@ -2,6 +2,7 @@
 pub mod can_handler;
 pub mod mqtt_handler;
 pub mod uploader;
+pub mod zenoh_handler;
 
 // MODULES
 pub mod audible;

@@ -77,7 +77,9 @@ pub async fn zenoh_fwd(
                 break;
             },
             Ok(res) = mqtt_recv_rx.recv() => {
-                let (data, topic) = convert_to_zenoh(res);
+                let (data, ref mut topic) = convert_to_zenoh(res);
+                *topic = topic.replace("?", "-");
+                trace!("PUTTING {}", topic);
                 if let Err(err)= session.put(topic, data).encoding(Encoding::APPLICATION_PROTOBUF).await {
                     warn!("Error sending zenoh message: {}", err);
                 }
