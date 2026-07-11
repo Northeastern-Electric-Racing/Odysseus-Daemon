@@ -51,8 +51,9 @@ pub async fn zenoh_rev(
 fn convert_to_mqtt(sample: zenoh::sample::Sample) -> Option<PublishableMessage> {
     let res = serverdata::ServerData::parse_from_reader(&mut sample.payload().reader()).ok()?;
 
+    let topic = sample.key_expr().to_string().replace("|", "?");
     Some(PublishableMessage {
-        topic: sample.key_expr().to_string(),
+        topic,
         data: res.values,
         unit: res.unit,
         time: res.time_us,
@@ -78,7 +79,7 @@ pub async fn zenoh_fwd(
             },
             Ok(res) = mqtt_recv_rx.recv() => {
                 let (data, ref mut topic) = convert_to_zenoh(res);
-                *topic = topic.replace("?", "-");
+                *topic = topic.replace("?", "|");
                 trace!("PUTTING {}", topic);
                 if let Err(err)= session.put(topic, data).encoding(Encoding::APPLICATION_PROTOBUF).await {
                     warn!("Error sending zenoh message: {}", err);

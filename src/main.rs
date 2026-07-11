@@ -96,12 +96,7 @@ struct VisualArgs {
     mqtt_url: String,
 
     /// Use Zenoh instead of MQTT -- will eventually become default
-    #[arg(
-        short = 'z',
-        long,
-        default_value = "localhost:1883",
-        env = "ODYSSEUS_DAEMON_ZENOH"
-    )]
+    #[arg(short = 'z', long, env = "ODYSSEUS_DAEMON_ZENOH")]
     zenoh: bool,
 
     /// The Scylla URL
