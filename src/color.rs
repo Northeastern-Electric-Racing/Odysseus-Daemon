@@ -15,7 +15,19 @@
 //! 4. Code the actual logic in the match in `calculate_settings`
 //!
 //! Adding a new follower (so the lights follow a specific pattern)
-//! 1. Add it to `FollowerItemSettings::from_idex`
+//! 1. Add it to `FollowerItemSettings::from_idex`, giving it its own index
+//!    (MQTT `NERO/Control/Mode` selects followers by this index)
+//! 2. To expose it as a `--color-mode` CLI/env default (not just reachable
+//!    over MQTT), add a variant to `DefaultWheelMode` and match it in
+//!    `DefaultWheelMode::into_wheel_mode`, pointing at the index from step 1
+//!
+//! Adding a new bipolar follower (single signed topic; solid color + LED
+//! count driven by sign/magnitude instead of a continuous gradient, e.g.
+//! motor current: green while discharging, blue while regenerating)
+//! 1. Add it to `BipolarFollowerItemSettings::from_idex`, giving it its own
+//!    index (MQTT `NERO/Control/Mode` mode 3 selects it by this index)
+//! 2. To expose it as a `--color-mode` CLI/env default, add a variant to
+//!    `DefaultWheelMode` and match it in `DefaultWheelMode::into_wheel_mode`
 
 use palette::{Hsv, IntoColor, LinSrgb, RgbHue, Srgb};
 use std::fmt::Debug;
@@ -41,13 +53,13 @@ type WheelColor = Hsv<palette::encoding::Srgb, f32>;
 type Settings = [WheelColor; LED_BANK_SIZE_REAL];
 
 #[derive(Default, Debug)]
-struct StartupVars {
+struct Demo1Vars {
     /// the LED we are currently cycling through
     pub curr_led: usize,
 }
 
 #[derive(Default, Debug)]
-enum Startup2VarsSequence {
+enum Demo2VarsSequence {
     #[default]
     Red = 0,
     Green,
@@ -56,11 +68,11 @@ enum Startup2VarsSequence {
 }
 
 #[derive(Default, Debug)]
-struct Startup2Vars {
+struct Demo2Vars {
     /// The current LED we are cycling through
     pub curr_led: usize,
     /// the color we are currently on
-    pub curr_status: Startup2VarsSequence,
+    pub curr_status: Demo2VarsSequence,
     /// when the color was last switched
     pub last_refresh: Option<tokio::time::Instant>,
 }
@@ -95,7 +107,13 @@ impl FollowerItemSettings {
                 max: 100f32,
                 color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
             },
-            2.. => {
+            2 => FollowerItemSettings {
+                topic: "NERO/FlappyBirdScore",
+                min: 0f32,
+                max: 20f32,
+                color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
+            },
+            3.. => {
                 warn!("Invalid follower item: {}, using default", idex);
                 FollowerItemSettings {
                     topic: "NERO/FlappyBirdScore",
@@ -131,28 +149,86 @@ impl FollowerSettings {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+struct BipolarFollowerItemSettings {
+    /// the topic name to get the data from
+    pub topic: &'static str,
+    /// the magnitude (always positive) at which all LEDs are lit while the value is negative
+    pub neg_max: f32,
+    /// the magnitude (always positive) at which all LEDs are lit while the value is positive
+    pub pos_max: f32,
+    /// solid color shown while the value is negative
+    pub neg_hue: RgbHue,
+    /// solid color shown while the value is positive
+    pub pos_hue: RgbHue,
+}
+
+impl BipolarFollowerItemSettings {
+    // ADD NEW BIPOLAR FOLLOWER HERE
+    fn from_idex(idex: usize) -> Self {
+        match idex {
+            0 => BipolarFollowerItemSettings {
+                topic: "DTI/Power/DC_Current",
+                neg_max: 75f32,
+                pos_max: 180f32,
+                neg_hue: RgbHue::from_degrees(240f32), // blue
+                pos_hue: RgbHue::from_degrees(120f32), // green
+            },
+            1.. => {
+                warn!("Invalid bipolar follower item: {}, using default", idex);
+                BipolarFollowerItemSettings {
+                    topic: "DTI/Power/DC_Current",
+                    neg_max: 75f32,
+                    pos_max: 180f32,
+                    neg_hue: RgbHue::from_degrees(240f32),
+                    pos_hue: RgbHue::from_degrees(120f32),
+                }
+            }
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+struct BipolarFollowerSettings {
+    pub item: BipolarFollowerItemSettings,
+    pub val: f32,
+}
+
+impl BipolarFollowerSettings {
+    fn to_bipolar_follower_settings(idex: usize) -> Self {
+        BipolarFollowerSettings {
+            item: BipolarFollowerItemSettings::from_idex(idex),
+            val: 0f32,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum WheelMode {
     /// A hue sweep of HSV on a loop
-    Startup(StartupVars),
+    Demo1(Demo1Vars),
     /// A RGB cycle through each LED
-    Startup2(Startup2Vars),
+    Demo2(Demo2Vars),
     /// A follower.  The first extra number defines the follower left to right, the 2nd defines the follower for coloring
     /// See FollowerItemSettings::from_idex()
     Follower(FollowerSettings),
+    /// A follower driven by a single signed value: LED count grows outward
+    /// from zero by magnitude, color is a solid hue selected by sign
+    /// (rather than a continuous gradient). See BipolarFollowerItemSettings::from_idex()
+    BipolarFollower(BipolarFollowerSettings),
 }
 
 impl WheelMode {
     /// Convert from the MQTT settings to a valid Wheel Mode
-    /// If an invalid setting is passed in wheel mode is reset to Startup
+    /// If an invalid setting is passed in wheel mode is reset to Demo1
     fn from_settings(value: u8, extra_data: &[f32]) -> Self {
         match value {
-            0 => Self::Startup(StartupVars::default()),
-            1 => Self::Startup2(Startup2Vars::default()),
+            0 => Self::Demo1(Demo1Vars::default()),
+            1 => Self::Demo2(Demo2Vars::default()),
             2 => {
                 if extra_data.len() < 2 {
-                    warn!("Invalid mode, switching to startup!");
-                    Self::Startup(StartupVars::default())
+                    warn!("Invalid mode, switching to demo 1!");
+                    Self::Demo1(Demo1Vars::default())
                 } else {
                     // Follower takes in two indexes from FollowerItemSettings to determine reactivity
                     Self::Follower(FollowerSettings::to_follower_settings(
@@ -161,9 +237,52 @@ impl WheelMode {
                     ))
                 }
             }
-            3.. => {
-                warn!("Invalid mode, switching to startup!");
-                Self::Startup(StartupVars::default())
+            3 => {
+                if extra_data.is_empty() {
+                    warn!("Invalid mode, switching to demo 1!");
+                    Self::Demo1(Demo1Vars::default())
+                } else {
+                    // BipolarFollower takes in one index from BipolarFollowerItemSettings
+                    Self::BipolarFollower(BipolarFollowerSettings::to_bipolar_follower_settings(
+                        *extra_data.first().unwrap() as usize,
+                    ))
+                }
+            }
+            4.. => {
+                warn!("Invalid mode, switching to demo 1!");
+                Self::Demo1(Demo1Vars::default())
+            }
+        }
+    }
+}
+
+/// The default wheel mode to boot the color controller into, before any
+/// `NERO/Control/Mode` command has been received over MQTT.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, Default)]
+pub enum DefaultWheelMode {
+    /// A hue sweep of HSV on a loop
+    Demo1,
+    /// A RGB cycle through each LED
+    Demo2,
+    /// A follower reacting to NERO/FlappyBirdScore
+    #[default]
+    Flappy,
+    /// A bipolar follower reacting to DTI/Power/DC_Current
+    Power,
+}
+
+impl DefaultWheelMode {
+    fn into_wheel_mode(self) -> WheelMode {
+        match self {
+            DefaultWheelMode::Demo1 => WheelMode::Demo1(Demo1Vars::default()),
+            DefaultWheelMode::Demo2 => WheelMode::Demo2(Demo2Vars::default()),
+            // FlappyBirdScore is follower index 2 -- see FollowerItemSettings::from_idex
+            DefaultWheelMode::Flappy => {
+                WheelMode::Follower(FollowerSettings::to_follower_settings(2, 2))
+            }
+            // DTI/Power/DC_Current is bipolar follower index 0 -- see BipolarFollowerItemSettings::from_idex
+            DefaultWheelMode::Power => {
+                WheelMode::BipolarFollower(BipolarFollowerSettings::to_bipolar_follower_settings(0))
             }
         }
     }
@@ -254,55 +373,59 @@ async fn execute_step(settings: Settings, path_cache: &[PathBuf; LED_BANK_SIZE_F
 /// Returns None of no settings changes are required
 fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<Settings> {
     match mode {
-        WheelMode::Startup(startup_vars) => {
+        WheelMode::Demo1(demo1_vars) => {
             let mut new_settings = *last_settings;
-            new_settings[startup_vars.curr_led].hue += RgbHue::from_degrees(1f32);
-            if new_settings[startup_vars.curr_led].hue.into_degrees() > 179f32 {
-                new_settings[startup_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
-                startup_vars.curr_led += 1;
-                if startup_vars.curr_led >= LED_BANK_SIZE_REAL {
-                    startup_vars.curr_led = 0;
+            // force full saturation/value so the sweeping LED is visible
+            // immediately, instead of relying on it having been lit already
+            new_settings[demo1_vars.curr_led].saturation = 1f32;
+            new_settings[demo1_vars.curr_led].value = 1f32;
+            new_settings[demo1_vars.curr_led].hue += RgbHue::from_degrees(1f32);
+            if new_settings[demo1_vars.curr_led].hue.into_degrees() > 179f32 {
+                new_settings[demo1_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
+                demo1_vars.curr_led += 1;
+                if demo1_vars.curr_led >= LED_BANK_SIZE_REAL {
+                    demo1_vars.curr_led = 0;
                 }
-                new_settings[startup_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
+                new_settings[demo1_vars.curr_led] = Hsv::from_components((0f32, 1f32, 1f32));
             }
             Some(new_settings)
         }
-        WheelMode::Startup2(startup2_vars) => {
+        WheelMode::Demo2(demo2_vars) => {
             let mut new_settings = *last_settings;
 
-            match startup2_vars.last_refresh {
+            match demo2_vars.last_refresh {
                 Some(time) => {
                     if time.elapsed() > Duration::from_secs(1) {
-                        startup2_vars.last_refresh = Some(tokio::time::Instant::now());
+                        demo2_vars.last_refresh = Some(tokio::time::Instant::now());
                     } else {
                         return None;
                     }
                 }
-                None => startup2_vars.last_refresh = Some(tokio::time::Instant::now()),
+                None => demo2_vars.last_refresh = Some(tokio::time::Instant::now()),
             }
-            match startup2_vars.curr_status {
-                Startup2VarsSequence::Red => {
-                    new_settings[startup2_vars.curr_led] =
+            match demo2_vars.curr_status {
+                Demo2VarsSequence::Red => {
+                    new_settings[demo2_vars.curr_led] =
                         Srgb::from_components((1f32, 0f32, 0f32)).into_color();
-                    startup2_vars.curr_status = Startup2VarsSequence::Blue;
+                    demo2_vars.curr_status = Demo2VarsSequence::Green;
                 }
-                Startup2VarsSequence::Blue => {
-                    new_settings[startup2_vars.curr_led] =
+                Demo2VarsSequence::Green => {
+                    new_settings[demo2_vars.curr_led] =
                         Srgb::from_components((0f32, 1f32, 0f32)).into_color();
-                    startup2_vars.curr_status = Startup2VarsSequence::Green;
+                    demo2_vars.curr_status = Demo2VarsSequence::Blue;
                 }
-                Startup2VarsSequence::Green => {
-                    new_settings[startup2_vars.curr_led] =
+                Demo2VarsSequence::Blue => {
+                    new_settings[demo2_vars.curr_led] =
                         Srgb::from_components((0f32, 0f32, 1f32)).into_color();
-                    startup2_vars.curr_status = Startup2VarsSequence::Off;
+                    demo2_vars.curr_status = Demo2VarsSequence::Off;
                 }
-                Startup2VarsSequence::Off => {
-                    new_settings[startup2_vars.curr_led] =
+                Demo2VarsSequence::Off => {
+                    new_settings[demo2_vars.curr_led] =
                         Srgb::from_components((0f32, 0f32, 0f32)).into_color();
-                    startup2_vars.curr_status = Startup2VarsSequence::Red;
-                    startup2_vars.curr_led += 1;
-                    if startup2_vars.curr_led >= LED_BANK_SIZE_REAL {
-                        startup2_vars.curr_led = 0;
+                    demo2_vars.curr_status = Demo2VarsSequence::Red;
+                    demo2_vars.curr_led += 1;
+                    if demo2_vars.curr_led >= LED_BANK_SIZE_REAL {
+                        demo2_vars.curr_led = 0;
                     }
                 }
             }
@@ -325,8 +448,16 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
             };
 
             // now get the hue of each lit up LED
-            let multiplier = (settings.color_val - settings.color.min)
-                / (settings.color.max - settings.color.min);
+            let color_range = settings.color.max - settings.color.min;
+            let multiplier = if color_range.abs() <= f32::EPSILON {
+                0f32
+            } else {
+                (settings
+                    .color_val
+                    .clamp(settings.color.min, settings.color.max)
+                    - settings.color.min)
+                    / color_range
+            };
             let hue_raw = (multiplier
                 * (settings.color.color_range.1.into_positive_degrees()
                     - settings.color.color_range.0.into_positive_degrees()))
@@ -343,6 +474,36 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
 
             Some(new_settings)
         }
+        WheelMode::BipolarFollower(settings) => {
+            let mut new_settings = *last_settings;
+
+            // pick the solid color and full-scale magnitude for whichever
+            // side of zero the value currently sits on
+            let (hue, magnitude, max) = if settings.val < 0f32 {
+                (settings.item.neg_hue, -settings.val, settings.item.neg_max)
+            } else {
+                (settings.item.pos_hue, settings.val, settings.item.pos_max)
+            };
+
+            let amt_on = if max.abs() <= f32::EPSILON {
+                1 // always one led on
+            } else {
+                // there are effectively 8 steps since the first one is always on
+                ((LED_BANK_SIZE_REAL - 1) as f32 * (magnitude.clamp(0f32, max) / max)).round()
+                    as usize
+                    + 1
+            };
+
+            for (index, value) in new_settings.iter_mut().enumerate() {
+                if index + 1 > amt_on {
+                    *value = Hsv::new_srgb_const(RgbHue::new(0.0f32), 0.0f32, 0.0f32);
+                } else {
+                    *value = Hsv::new_srgb_const(hue, 1.0f32, 1.0f32);
+                }
+            }
+
+            Some(new_settings)
+        }
     }
 }
 
@@ -353,18 +514,31 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
 fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode) -> bool {
     // handle following
     match mode {
-        WheelMode::Startup(_) => (),
-        WheelMode::Startup2(_) => (),
+        WheelMode::Demo1(_) => (),
+        WheelMode::Demo2(_) => (),
         WheelMode::Follower(settings) => {
+            let mut updated = false;
             if msg.topic == settings.lr.topic
                 && let Some(val) = msg.values.first()
             {
                 settings.lr_val = *val;
-                return false;
-            } else if msg.topic == settings.color.topic
+                updated = true;
+            }
+            if msg.topic == settings.color.topic
                 && let Some(val) = msg.values.first()
             {
                 settings.color_val = *val;
+                updated = true;
+            }
+            if updated {
+                return false;
+            }
+        }
+        WheelMode::BipolarFollower(settings) => {
+            if msg.topic == settings.item.topic
+                && let Some(val) = msg.values.first()
+            {
+                settings.val = *val;
                 return false;
             }
         }
@@ -398,6 +572,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
 pub async fn color_controller(
     cancel_token: CancellationToken,
     mut mqtt_recv_rx: broadcast::Receiver<PlaybackData>,
+    default_mode: DefaultWheelMode,
 ) {
     // cache the paths for quick reuse here, because building a Path is zero cost but also I am afraid
     let path_cache: [PathBuf; LED_BANK_SIZE_FUCKED] = LED_BANK_WRITE_LISTINGS.map(|f| {
@@ -409,8 +584,8 @@ pub async fn color_controller(
     // smaller than fastest human color change (about 13ms)
     let mut tick_size = tokio::time::interval(CALC_CYCLE_TIME);
 
-    // this is the default boot mode defined here
-    let mut current_mode = WheelMode::Startup2(Startup2Vars::default());
+    // the default boot mode, chosen via CLI/env (falls back to Flappy if unset)
+    let mut current_mode = default_mode.into_wheel_mode();
     let mut current_brightness = 175;
     // boot brightness is always zero for some reason with multi-led
     let mut last_brightness = 0;
