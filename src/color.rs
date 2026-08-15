@@ -108,7 +108,7 @@ impl FollowerItemSettings {
                 color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
             },
             2 => FollowerItemSettings {
-                topic: "NERO/FlappyBirdScore",
+                topic: "NERO/FLAPPYBIRD/SCORE",
                 min: 0f32,
                 max: 20f32,
                 color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
@@ -116,7 +116,7 @@ impl FollowerItemSettings {
             3.. => {
                 warn!("Invalid follower item: {}, using default", idex);
                 FollowerItemSettings {
-                    topic: "NERO/FlappyBirdScore",
+                    topic: "NERO/FLAPPYBIRD/SCORE",
                     min: 0f32,
                     max: 20f32,
                     color_range: (RgbHue::from_degrees(-40f32), RgbHue::from_degrees(169f32)),
