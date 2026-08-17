@@ -6,7 +6,7 @@ use odysseus_daemon::{
     audible::audible_manager,
     can::can_data_scraper,
     can_handler::can_handler,
-    color::color_controller,
+    color::{DefaultWheelMode, color_controller},
     daq_monitor::monitor_daq,
     gps::gps_manager,
     halow::halow_scraper,
@@ -82,6 +82,16 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_COLOR_ENABLE")]
     color: bool,
 
+    /// Default wheel color mode to boot into if no mode command has been
+    /// received yet over MQTT
+    #[arg(
+        long,
+        env = "ODYSSEUS_DAEMON_COLOR_MODE",
+        value_enum,
+        default_value = "flappy"
+    )]
+    color_mode: DefaultWheelMode,
+
     /// The input video file
     #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
     video_uri: Option<String>,
@@ -152,7 +162,7 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_ZENOH_BRIDGE_REV")]
     zenoh_rev: bool,
 
-    /// Zenoh bridge (Zenoh->MQTT) support
+    /// Zenoh conf file
     #[arg(
         long,
         env = "ODYSSEUS_DAEMON_ZENOH_CONF",
@@ -344,7 +354,11 @@ async fn main() {
 
     if cli.color {
         info!("Running color controller for wheel");
-        task_tracker.spawn(color_controller(token.clone(), mqtt_recv_rx.unwrap()));
+        task_tracker.spawn(color_controller(
+            token.clone(),
+            mqtt_recv_rx.unwrap(),
+            cli.color_mode,
+        ));
     }
 
     if cli.net
