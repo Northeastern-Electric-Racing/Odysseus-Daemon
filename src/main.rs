@@ -18,12 +18,16 @@ use odysseus_daemon::{
     playback_data,
     sys_parser::sys_parser,
     visual::{SavePipelineOpts, run_save_pipeline},
+    zenoh_bridge::{zenoh_fwd, zenoh_rev},
+    zenoh_handler::ZenohProcessor,
 };
 use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
     signal,
     sync::{broadcast, mpsc, watch},
 };
+
+use std::path::PathBuf;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
@@ -91,6 +95,10 @@ struct VisualArgs {
     )]
     mqtt_url: String,
 
+    /// Use Zenoh instead of MQTT -- will eventually become default
+    #[arg(short = 'z', long, env = "ODYSSEUS_DAEMON_ZENOH")]
+    zenoh: bool,
+
     /// The Scylla URL
     #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
     scylla_url: Option<String>,
@@ -135,6 +143,22 @@ struct VisualArgs {
     /// The base MQTT topic/node name (for net, halow)
     #[arg(long, env = "ODYSSEUS_DAEMON_BASE_NODE", default_value = "TPU")]
     base_node: String,
+
+    /// Zenoh bridge (MQTT->Zenoh) support
+    #[arg(long, env = "ODYSSEUS_DAEMON_ZENOH_BRIDGE_FWD")]
+    zenoh_fwd: bool,
+
+    /// Zenoh bridge (Zenoh->MQTT) support
+    #[arg(long, env = "ODYSSEUS_DAEMON_ZENOH_BRIDGE_REV")]
+    zenoh_rev: bool,
+
+    /// Zenoh bridge (Zenoh->MQTT) support
+    #[arg(
+        long,
+        env = "ODYSSEUS_DAEMON_ZENOH_CONF",
+        default_value_os = "./zenoh.json5"
+    )]
+    zenoh_conf: PathBuf,
 }
 
 /// Folder hierarchy
@@ -187,7 +211,7 @@ async fn main() {
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
     // create wildcard mqtt channel only if logger is enabled
-    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger || cli.color {
+    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger || cli.color || cli.zenoh_fwd {
         let (tx, rx) = broadcast::channel::<playback_data::PlaybackData>(1000);
         (Some(tx), Some(rx))
     } else {
@@ -197,21 +221,38 @@ async fn main() {
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    info!("Running MQTT processor");
-    let (recv, opts) = MqttProcessor::new(
-        token.clone(),
-        mqtt_sender_rx,
-        hv_stat_send,
-        cli.mock,
-        mute_stat_send,
-        mqtt_recv_tx,
-        mqtt_sys_tx,
-        cli.mqtt_url,
-        cli.scylla_url,
-    );
-    let (client, eventloop) = AsyncClient::new(opts, 600);
-    let client_sharable: Arc<AsyncClient> = Arc::new(client);
-    task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
+    if cli.zenoh {
+        info!("Running zenoh processor");
+        let processor = ZenohProcessor::new(
+            token.clone(),
+            mqtt_sender_rx,
+            hv_stat_send,
+            cli.mock,
+            mute_stat_send,
+            mqtt_recv_tx,
+            cli.zenoh_conf.clone(),
+            cli.scylla_url,
+        )
+        .await;
+        task_tracker.spawn(processor.process_zenoh());
+    } else {
+        info!("Running MQTT processor");
+        let (recv, opts) = MqttProcessor::new(
+            token.clone(),
+            mqtt_sender_rx,
+            hv_stat_send,
+            cli.mock,
+            mute_stat_send,
+            mqtt_recv_tx,
+            mqtt_sys_tx,
+            cli.mqtt_url,
+            cli.scylla_url,
+        );
+
+        let (client, eventloop) = AsyncClient::new(opts, 600);
+        let client_sharable: Arc<AsyncClient> = Arc::new(client);
+        task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
+    }
 
     // TASK SPAWNING
 
@@ -270,6 +311,23 @@ async fn main() {
             hv_stat_recv.clone(),
         ));
     }
+
+    if cli.zenoh_rev {
+        info!("Running Zenoh Rev");
+        task_tracker.spawn(zenoh_rev(
+            token.clone(),
+            cli.zenoh_conf,
+            mqtt_sender_tx.clone(),
+        ));
+    } else if cli.zenoh_fwd {
+        info!("Running Zenoh Fwd");
+        task_tracker.spawn(zenoh_fwd(
+            token.clone(),
+            cli.zenoh_conf,
+            (*(mqtt_recv_rx.as_ref().unwrap())).resubscribe(),
+        ));
+    }
+
     if cli.sys {
         info!("Running SYS translator");
         task_tracker.spawn(sys_parser(

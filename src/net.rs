@@ -35,7 +35,7 @@ pub async fn network_scraper(
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/tx_bytes"),
             data: vec![],
-            unit: "bytes/s",
+            unit: "bytes/s".to_string(),
             time: 0,
         };
 
@@ -46,7 +46,7 @@ pub async fn network_scraper(
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/rx_bytes"),
             data: vec![],
-            unit: "bytes/s",
+            unit: "bytes/s".to_string(),
             time: 0,
         };
 
@@ -57,7 +57,7 @@ pub async fn network_scraper(
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/rx_errors"),
             data: vec![],
-            unit: "bytes",
+            unit: "bytes".to_string(),
             time: 0,
         };
 
@@ -68,7 +68,7 @@ pub async fn network_scraper(
         let msg = PublishableMessage {
             topic: format!("{base_name}/{iface}/tx_errors"),
             data: vec![],
-            unit: "bytes",
+            unit: "bytes".to_string(),
             time: 0,
         };
 

@@ -82,7 +82,7 @@ pub async fn collect_data(
                     }
                 };
 
-                vec![PublishableMessage{ topic: TOPIC.to_string(), data: vec![value.unwrap()], unit: UNIT,time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 }]
+                vec![PublishableMessage{ topic: TOPIC.to_string(), data: vec![value.unwrap()], unit: UNIT.to_string(),time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 }]
 
             }
             _ = cpu_usage_int.tick() => {
@@ -104,8 +104,8 @@ pub async fn collect_data(
                 trace!("Using process: {:?}", process.name());
 
                 vec![
-                    PublishableMessage{ topic: TOPIC_C.to_string(), data: vec![sys.global_cpu_usage()], unit: UNIT_C, time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 },
-                PublishableMessage{ topic: TOPIC_B.to_string(), data: vec![process.cpu_usage()], unit: UNIT_B, time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 }]
+                    PublishableMessage{ topic: TOPIC_C.to_string(), data: vec![sys.global_cpu_usage()], unit: UNIT_C.to_string(), time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 },
+                PublishableMessage{ topic: TOPIC_B.to_string(), data: vec![process.cpu_usage()], unit: UNIT_B.to_string(), time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64 }]
             },
             _ = mem_avail_int.tick() => {
                 const TOPIC: &str = "TPU/OnBoard/MemAvailable";
@@ -113,7 +113,7 @@ pub async fn collect_data(
 
                 sys.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 
-                vec![PublishableMessage { topic: TOPIC.to_string(), data: vec![sys.free_memory() as f32 / 1e6], unit: UNIT, time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64}]
+                vec![PublishableMessage { topic: TOPIC.to_string(), data: vec![sys.free_memory() as f32 / 1e6], unit: UNIT.to_string(), time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64}]
             }
         };
         for msg in msgs {

@@ -70,7 +70,7 @@ pub async fn run_save_pipeline(
                         "-f", "tee", "-map", "0:v",
                         &format!(
                             "[f=mp4:onfail=ignore:use_fifo=1:fifo_format=rawvideo:fifo_options=drop=1]{}|[f=mpegts:onfail=ignore:use_fifo=1:fifo_format=rawvideo:fifo_options=drop=1]udp://192.168.100.11:7998?pkt_size=1316",
-                            &save_location
+                            save_location
                         ),
                     ]).stdin(Stdio::null()).spawn()?;
                     cmd = Some(cmd_new);

@@ -26,6 +26,7 @@ regex = "1.12.3"
 tokio-serial = "5.4.5"
 palette = "0.7.6"
 heapless = "0.9.3"
+zenoh = "1.9.0"
 
 [build-dependencies]
 protobuf-codegen = "3.7.1"

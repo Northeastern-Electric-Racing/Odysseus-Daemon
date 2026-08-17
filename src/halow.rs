@@ -66,7 +66,7 @@ async fn handle_tick(
         send.push(PublishableMessage {
             topic: rssi_topic.clone(),
             data: vec![fl],
-            unit: "dBm",
+            unit: "dBm".to_string(),
             time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
         })
     } else {
@@ -92,7 +92,7 @@ async fn handle_tick(
             send.push(PublishableMessage {
                 topic: mcs_topic_rx.clone(),
                 data: vec![fl],
-                unit: "",
+                unit: "".to_string(),
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
             });
         }
@@ -103,7 +103,7 @@ async fn handle_tick(
             send.push(PublishableMessage {
                 topic: mcs_topic_tx.to_string(),
                 data: vec![fl],
-                unit: "",
+                unit: "".to_string(),
                 time: UNIX_EPOCH.elapsed().unwrap().as_micros() as u64,
             })
         }
