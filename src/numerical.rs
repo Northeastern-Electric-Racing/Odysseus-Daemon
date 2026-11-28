@@ -1,9 +1,9 @@
-//! Sends hardware property data over MQTT.
+//! Sends hardware property data over Zenoh.
 //!
 //! Beta
 //!
 //! Requires:
-//!  - `/var/run/mosquitto.pid` to contain valid pid
+//!  - `/var/run/zenohd.pid` to contain valid pid
 //!  - CPU temperature available
 //!
 //! Will fallback if any hardware is unavailable, so should not critically fail.
@@ -23,7 +23,7 @@ use crate::PublishableMessage;
 /// sender of the messages
 pub async fn collect_data(
     cancel_token: CancellationToken,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
 ) {
     // create requisites
     let mut sys = System::new_all();
@@ -38,10 +38,10 @@ pub async fn collect_data(
     let mut temperature_component = components.iter_mut().find(|x| x.temperature().is_some());
 
     // for broker CPU
-    let mut pid = match fs::read_to_string("/var/run/mosquitto.pid") {
+    let mut pid = match fs::read_to_string("/var/run/zenohd.pid") {
         Ok(p) => p,
         Err(_) => {
-            warn!("Could not read mosquitto PID, using 1");
+            warn!("Could not read zenohd PID, using 1");
             "1".to_string()
         }
     };
@@ -49,7 +49,7 @@ pub async fn collect_data(
         pid.pop();
     }
     let pid_clean = str::parse::<u32>(&pid).unwrap_or_else(|a| {
-        warn!("Could not parse mosquitto pid, using 1, error: {}", a);
+        warn!("Could not parse zenohd pid, using 1, error: {}", a);
         1
     });
 
@@ -63,7 +63,7 @@ pub async fn collect_data(
     loop {
         let msgs = tokio::select! {
             _ = cancel_token.cancelled() => {
-                debug!("Shutting down MQTT processor!");
+                debug!("Shutting down numerical collector!");
                 break;
             },
             // STEP 2: add a block to gather the data and send the message, include topic and unit blocks
@@ -98,7 +98,7 @@ pub async fn collect_data(
                         true);
 
                 let process = sys.process(Pid::from_u32(pid_clean)).unwrap_or_else(|| {
-                    warn!("Could not find mosquitto from PID, using 1");
+                    warn!("Could not find zenohd from PID, using 1");
                     sys.process(Pid::from(1)).unwrap()
                 });
                 trace!("Using process: {:?}", process.name());
@@ -117,8 +117,8 @@ pub async fn collect_data(
             }
         };
         for msg in msgs {
-            let Ok(_) = mqtt_sender_tx.send(msg).await else {
-                warn!("Could not send mpsc msg to mqtt send");
+            let Ok(_) = zenoh_sender_tx.send(msg).await else {
+                warn!("Could not send mpsc msg to zenoh send");
                 continue;
             };
         }

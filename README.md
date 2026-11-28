@@ -23,12 +23,11 @@ Modules
 - `numerical`: Telemetry scraper and sender (tpu-telemetry python replacement).  Status: Beta
 - `net`: Network statistics telemetry scraper and sender for both TPU and Base Station. Status: Beta
 - `halow`: Hardware statistics telemetry scraper and sender for both TPU and Base Station. Status: Beta
-- `logger`: MQTT receiver and disk logger. Status: Release
+- `logger`: Zenoh receiver and disk logger. Status: Release
 - `color`: The wheel LED controller and API system. Status: Beta
 - `daq`: The Jack DAQ serial scraper. Status: Beta
 - `can`: Diagnostics for the CANbus interface.  Status: Release
 - `gps`: Data scraper for the GPS. Status: Beta
-- `sys_parser`: Read the SYS subsystem to understand mosquitto diagnostics. Status: Beta
 
 Upload modules:
 - `logger`: Upload from the logger module to scylla. Status: Release

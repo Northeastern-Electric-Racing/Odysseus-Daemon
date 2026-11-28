@@ -1,4 +1,4 @@
-//! HELPER: Receive and send MQTT
+//! HELPER: Receive and send Zenoh
 
 use std::{
     path::PathBuf,
@@ -18,7 +18,7 @@ use crate::{
 
 /// The chief processor of incoming zenoh data, this handles
 /// - zenoh state
-/// - reception via mqtt and subsequent parsing
+/// - reception via zenoh and subsequent parsing
 ///   Takes in many channels:
 /// - zenoh_sender_rx: A receiver of any messages, it then publishes them
 /// - hv_stat_send: A sender of the current HV state (only if it changes!), will be set to ON if augment_hv_on is true
@@ -37,14 +37,14 @@ pub struct ZenohProcessor {
 
 #[allow(clippy::too_many_arguments)]
 impl ZenohProcessor {
-    /// Creates a new mqtt receiver and sender
+    /// Creates a new zenoh receiver and sender
     pub async fn new(
         cancel_token: CancellationToken,
-        mqtt_sender_rx: Receiver<PublishableMessage>,
+        zenoh_sender_rx: Receiver<PublishableMessage>,
         hv_stat_send: Sender<HVTransition>,
         augment_hv_on: bool,
         mute_stat_send: Sender<bool>,
-        mqtt_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
+        zenoh_recv_tx: Option<broadcast::Sender<playback_data::PlaybackData>>,
         conf_path: PathBuf,
         scylla_url: Option<String>,
     ) -> ZenohProcessor {
@@ -56,17 +56,17 @@ impl ZenohProcessor {
 
         ZenohProcessor {
             cancel_token,
-            zenoh_sender_rx: mqtt_sender_rx,
+            zenoh_sender_rx,
             hv_stat_send,
             augment_hv_on,
             mute_stat_send,
-            zenoh_recv_tx: mqtt_recv_tx,
+            zenoh_recv_tx,
             scylla_url,
             session,
         }
     }
 
-    fn convert_to_mqtt(sample: zenoh::sample::Sample) -> Option<PublishableMessage> {
+    fn parse_sample(sample: zenoh::sample::Sample) -> Option<PublishableMessage> {
         let res = serverdata::ServerData::parse_from_reader(&mut sample.payload().reader()).ok()?;
 
         Some(PublishableMessage {
@@ -78,7 +78,7 @@ impl ZenohProcessor {
     }
 
     async fn handle_recv(&self, sample: Sample, last_stat: &mut bool) {
-        let Some(msg) = Self::convert_to_mqtt(sample) else {
+        let Some(msg) = Self::parse_sample(sample) else {
             warn!("Could not deserialize Zenoh incoming!");
             return;
         };
@@ -154,7 +154,7 @@ impl ZenohProcessor {
             }
             _ => {}
         }
-        // if using it, send all mqtt messages to data logger
+        // if using it, send all zenoh messages to data logger (and other consumers)
         if let Some(ref recv) = self.zenoh_recv_tx
             && let Err(err) = recv.send(playback_data::PlaybackData {
                 topic: msg.topic.to_string(),
@@ -168,14 +168,14 @@ impl ZenohProcessor {
         }
     }
 
-    /// This handles the reception of mqtt messages, will not return
+    /// This handles the reception of zenoh messages, will not return
     pub async fn process_zenoh(mut self) {
-        debug!("Subscribing to siren, all topics");
+        debug!("Subscribing to all keys");
         let subscriber = self
             .session
             .declare_subscriber("**")
             .await
-            .expect("Could not subscribe to MQTT");
+            .expect("Could not subscribe to Zenoh");
 
         // if augment HV on, send as such, otherwise start default off
         let mut last_stat = if self.augment_hv_on {

@@ -3,7 +3,7 @@
 //! Beta/buggy/unused
 //!
 //! Requires:
-//!  - Sending data over MQTT
+//!  - Sending data over Zenoh
 //!  - Sending data over CAN bus
 //!
 //!
@@ -28,7 +28,7 @@ pub async fn collect_daq(
     cancel_token: CancellationToken,
     device: String,
     daq_monitor_tx: Sender<bool>,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>,
 ) {
     let port = tokio_serial::new(device, 115_200)
@@ -40,7 +40,7 @@ pub async fn collect_daq(
     let mut lines = reader.lines();
 
     loop {
-        let (mqtt_msgs, can_msgs) = tokio::select! {
+        let (zenoh_msgs, can_msgs) = tokio::select! {
             _ = cancel_token.cancelled() => {
                 debug!("Shutting down DAQ process: cancel called");
                 break;
@@ -98,14 +98,14 @@ pub async fn collect_daq(
             } // NOTE: CAN Frame currently only sends wheel sensor data in big endian
         };
 
-        if !mqtt_msgs.is_empty()
+        if !zenoh_msgs.is_empty()
             && let Err(err) = daq_monitor_tx.send(true).await
         {
             warn!("Failed to send to daq watchdog: {}", err);
         };
-        for mqtt in mqtt_msgs {
-            if let Err(err) = mqtt_sender_tx
-                .send_timeout(mqtt, Duration::from_millis(50))
+        for msg in zenoh_msgs {
+            if let Err(err) = zenoh_sender_tx
+                .send_timeout(msg, Duration::from_millis(50))
                 .await
             {
                 warn!("Could not pub to sender from daq: {}", err);

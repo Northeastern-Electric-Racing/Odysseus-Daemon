@@ -82,7 +82,7 @@ pub async fn run_save_pipeline(
                         }
                         if let Some(val) = cmd.as_mut() {
                         let proc_id = val.id().unwrap_or_default();
-                        // logic to safely shutdown since ffmpeg doesnt capture our fake ctrl+c from mqtt
+                        // logic to safely shutdown since ffmpeg doesnt capture our fake ctrl+c from the HV transition
                         // first try and run a SIGTERM kill
                         match Command::new("kill").args(["-SIGTERM".to_string(), proc_id.to_string(), ]).spawn() { Ok(mut child) => {
                             if let Err(err) = child.wait().await {

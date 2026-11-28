@@ -20,7 +20,7 @@ use tracing::warn;
 pub async fn halow_scraper(
     cancel_token: CancellationToken,
     base_name: String,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
 ) {
     let mut signal_sync = tokio::time::interval(Duration::from_millis(50));
 
@@ -40,7 +40,7 @@ pub async fn halow_scraper(
             },
             _ =  signal_sync.tick() => {
                 let msgs = handle_tick(&rssi_regex, &mcs_regex, rssi_topic.clone(), mcs_topic_tx.clone(), mcs_topic_rx.clone()).await;
-                handle_sends(msgs, &mqtt_sender_tx).await;
+                handle_sends(msgs, &zenoh_sender_tx).await;
             }
         }
     }
@@ -114,11 +114,11 @@ async fn handle_tick(
 
 async fn handle_sends(
     send_list: Vec<PublishableMessage>,
-    mqtt_sender_tx: &Sender<PublishableMessage>,
+    zenoh_sender_tx: &Sender<PublishableMessage>,
 ) {
     for item in send_list.into_iter() {
-        if let Err(err) = mqtt_sender_tx.send(item).await {
-            warn!("Error putting message in MQTT queue for net: {} ", err);
+        if let Err(err) = zenoh_sender_tx.send(item).await {
+            warn!("Error putting message in Zenoh queue: {} ", err);
         }
     }
 }

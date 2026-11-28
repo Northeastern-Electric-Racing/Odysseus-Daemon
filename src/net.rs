@@ -21,7 +21,7 @@ type NetMeasurement = (PathBuf, PublishableMessage, Option<(Instant, u32)>);
 
 pub async fn network_scraper(
     cancel_token: CancellationToken,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
     base_name: String,
     network_ifaces: Vec<String>,
 ) {
@@ -86,7 +86,7 @@ pub async fn network_scraper(
                     warn!("Error trying to read net statistics: {}", err);
                     continue;
                 }
-                handle_sends(&send_list, &mqtt_sender_tx).await;
+                handle_sends(&send_list, &zenoh_sender_tx).await;
             }
         }
     }
@@ -118,11 +118,11 @@ async fn handle_tick(send_list: &mut [NetMeasurement]) -> Result<(), std::io::Er
 
 async fn handle_sends(
     send_list: &Vec<NetMeasurement>,
-    mqtt_sender_tx: &Sender<PublishableMessage>,
+    zenoh_sender_tx: &Sender<PublishableMessage>,
 ) {
     for item in send_list {
-        if let Err(err) = mqtt_sender_tx.send(item.1.clone()).await {
-            warn!("Error putting message in MQTT queue for net: {} ", err);
+        if let Err(err) = zenoh_sender_tx.send(item.1.clone()).await {
+            warn!("Error putting message in Zenoh queue: {} ", err);
         }
     }
 }
