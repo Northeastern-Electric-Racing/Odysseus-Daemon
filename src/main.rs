@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use clap::Parser;
 use odysseus_daemon::{
     HVTransition, PublishableMessage, SAVE_LOCATION,
@@ -12,16 +10,12 @@ use odysseus_daemon::{
     halow::halow_scraper,
     lockdown::lockdown_runner,
     logger::logger_manager,
-    mqtt_handler::MqttProcessor,
     net::network_scraper,
     numerical::collect_data,
     playback_data,
-    sys_parser::sys_parser,
     visual::{SavePipelineOpts, run_save_pipeline},
-    zenoh_bridge::{zenoh_fwd, zenoh_rev},
     zenoh_handler::ZenohProcessor,
 };
-use rumqttc::v5::{AsyncClient, mqttbytes::v5::Publish};
 use tokio::{
     signal,
     sync::{broadcast, mpsc, watch},
@@ -74,16 +68,12 @@ struct VisualArgs {
     #[arg(short = 'v', long, env = "ODYSSEUS_DAEMON_VIDEO_ENABLE")]
     video: bool,
 
-    /// Enable Mosquitto SYS translator module
-    #[arg(long, env = "ODYSSEUS_DAEMON_SYS_ENABLE")]
-    sys: bool,
-
     /// Enable wheel LED color controller
     #[arg(long, env = "ODYSSEUS_DAEMON_COLOR_ENABLE")]
     color: bool,
 
     /// Default wheel color mode to boot into if no mode command has been
-    /// received yet over MQTT
+    /// received yet over Zenoh
     #[arg(
         long,
         env = "ODYSSEUS_DAEMON_COLOR_MODE",
@@ -95,19 +85,6 @@ struct VisualArgs {
     /// The input video file
     #[arg(short = 'l', long, env = "ODYSSEUS_DAEMON_VIDEO_FILE")]
     video_uri: Option<String>,
-
-    /// The MQTT/Siren URL
-    #[arg(
-        short = 'u',
-        long,
-        default_value = "localhost:1883",
-        env = "ODYSSEUS_DAEMON_SIREN_URL"
-    )]
-    mqtt_url: String,
-
-    /// Use Zenoh instead of MQTT -- will eventually become default
-    #[arg(short = 'z', long, env = "ODYSSEUS_DAEMON_ZENOH")]
-    zenoh: bool,
 
     /// The Scylla URL
     #[arg(short = 'S', long, env = "ODYSSEUS_DAEMON_SCYLLA_URL")]
@@ -150,17 +127,9 @@ struct VisualArgs {
     #[arg(long, env = "ODYSSEUS_DAEMON_HW_IFACES", default_value = "wlan0")]
     hw_iface: String,
 
-    /// The base MQTT topic/node name (for net, halow)
+    /// The base Zenoh key/node name (for net, halow)
     #[arg(long, env = "ODYSSEUS_DAEMON_BASE_NODE", default_value = "TPU")]
     base_node: String,
-
-    /// Zenoh bridge (MQTT->Zenoh) support
-    #[arg(long, env = "ODYSSEUS_DAEMON_ZENOH_BRIDGE_FWD")]
-    zenoh_fwd: bool,
-
-    /// Zenoh bridge (Zenoh->MQTT) support
-    #[arg(long, env = "ODYSSEUS_DAEMON_ZENOH_BRIDGE_REV")]
-    zenoh_rev: bool,
 
     /// Zenoh conf file
     #[arg(
@@ -204,24 +173,17 @@ async fn main() {
     // set save location
     SAVE_LOCATION.get_or_init(|| cli.output_folder.clone());
 
-    // channel to pass the mqtt data
+    // channel to pass the data to be published over zenoh
     // TODO tune buffer size
-    let (mqtt_sender_tx, mqtt_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
-
-    let (mqtt_sys_tx, mqtt_sys_rx) = if cli.sys {
-        let res = mpsc::channel::<Publish>(100);
-        (Some(res.0), Some(res.1))
-    } else {
-        (None, None)
-    };
+    let (zenoh_sender_tx, zenoh_sender_rx) = mpsc::channel::<PublishableMessage>(1000);
 
     let (can_handler_tx, can_handler_rx) = mpsc::channel::<CanFrame>(1000);
 
     let (hv_stat_send, hv_stat_recv) = watch::channel(HVTransition::TransitionOff);
     let (mute_stat_send, mute_stat_recv) = watch::channel(false);
 
-    // create wildcard mqtt channel only if logger is enabled
-    let (mqtt_recv_tx, mqtt_recv_rx) = if cli.logger || cli.color || cli.zenoh_fwd {
+    // create wildcard zenoh channel only if a consumer of all messages is enabled
+    let (zenoh_recv_tx, zenoh_recv_rx) = if cli.logger || cli.color {
         let (tx, rx) = broadcast::channel::<playback_data::PlaybackData>(1000);
         (Some(tx), Some(rx))
     } else {
@@ -231,38 +193,19 @@ async fn main() {
     let task_tracker = TaskTracker::new();
     let token = CancellationToken::new();
 
-    if cli.zenoh {
-        info!("Running zenoh processor");
-        let processor = ZenohProcessor::new(
-            token.clone(),
-            mqtt_sender_rx,
-            hv_stat_send,
-            cli.mock,
-            mute_stat_send,
-            mqtt_recv_tx,
-            cli.zenoh_conf.clone(),
-            cli.scylla_url,
-        )
-        .await;
-        task_tracker.spawn(processor.process_zenoh());
-    } else {
-        info!("Running MQTT processor");
-        let (recv, opts) = MqttProcessor::new(
-            token.clone(),
-            mqtt_sender_rx,
-            hv_stat_send,
-            cli.mock,
-            mute_stat_send,
-            mqtt_recv_tx,
-            mqtt_sys_tx,
-            cli.mqtt_url,
-            cli.scylla_url,
-        );
-
-        let (client, eventloop) = AsyncClient::new(opts, 600);
-        let client_sharable: Arc<AsyncClient> = Arc::new(client);
-        task_tracker.spawn(recv.process_mqtt(client_sharable.clone(), eventloop));
-    }
+    info!("Running zenoh processor");
+    let processor = ZenohProcessor::new(
+        token.clone(),
+        zenoh_sender_rx,
+        hv_stat_send,
+        cli.mock,
+        mute_stat_send,
+        zenoh_recv_tx,
+        cli.zenoh_conf,
+        cli.scylla_url,
+    )
+    .await;
+    task_tracker.spawn(processor.process_zenoh());
 
     // TASK SPAWNING
 
@@ -287,14 +230,14 @@ async fn main() {
     }
     if cli.data {
         info!("Running TPU data collector");
-        task_tracker.spawn(collect_data(token.clone(), mqtt_sender_tx.clone()));
+        task_tracker.spawn(collect_data(token.clone(), zenoh_sender_tx.clone()));
     }
     if cli.daq {
         info!("Running DAQ data collector");
         task_tracker.spawn(monitor_daq(
             token.clone(),
             cli.daq_device.expect("failed to init daq device"),
-            mqtt_sender_tx.clone(),
+            zenoh_sender_tx.clone(),
             can_handler_tx,
         ));
     }
@@ -317,46 +260,21 @@ async fn main() {
         info!("Running logger module");
         task_tracker.spawn(logger_manager(
             token.clone(),
-            mqtt_recv_rx.as_ref().unwrap().resubscribe(),
+            zenoh_recv_rx.as_ref().unwrap().resubscribe(),
             hv_stat_recv.clone(),
-        ));
-    }
-
-    if cli.zenoh_rev {
-        info!("Running Zenoh Rev");
-        task_tracker.spawn(zenoh_rev(
-            token.clone(),
-            cli.zenoh_conf,
-            mqtt_sender_tx.clone(),
-        ));
-    } else if cli.zenoh_fwd {
-        info!("Running Zenoh Fwd");
-        task_tracker.spawn(zenoh_fwd(
-            token.clone(),
-            cli.zenoh_conf,
-            (*(mqtt_recv_rx.as_ref().unwrap())).resubscribe(),
-        ));
-    }
-
-    if cli.sys {
-        info!("Running SYS translator");
-        task_tracker.spawn(sys_parser(
-            token.clone(),
-            mqtt_sys_rx.unwrap(),
-            mqtt_sender_tx.clone(),
         ));
     }
 
     if cli.gps {
         info!("Running GPS Manager");
-        task_tracker.spawn(gps_manager(token.clone(), mqtt_sender_tx.clone()));
+        task_tracker.spawn(gps_manager(token.clone(), zenoh_sender_tx.clone()));
     }
 
     if cli.color {
         info!("Running color controller for wheel");
         task_tracker.spawn(color_controller(
             token.clone(),
-            mqtt_recv_rx.unwrap(),
+            zenoh_recv_rx.unwrap(),
             cli.color_mode,
         ));
     }
@@ -367,7 +285,7 @@ async fn main() {
         info!("Running network statistics scraper");
         task_tracker.spawn(network_scraper(
             token.clone(),
-            mqtt_sender_tx.clone(),
+            zenoh_sender_tx.clone(),
             cli.base_node.clone(),
             ifaces,
         ));
@@ -378,7 +296,7 @@ async fn main() {
         task_tracker.spawn(halow_scraper(
             token.clone(),
             cli.base_node.clone(),
-            mqtt_sender_tx.clone(),
+            zenoh_sender_tx.clone(),
         ));
     }
 
@@ -386,7 +304,7 @@ async fn main() {
         info!("Running CAN statistics scraper");
         task_tracker.spawn(can_data_scraper(
             token.clone(),
-            mqtt_sender_tx,
+            zenoh_sender_tx,
             cli.base_node,
             cli.socketcan_iface,
         ));

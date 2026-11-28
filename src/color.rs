@@ -16,16 +16,16 @@
 //!
 //! Adding a new follower (so the lights follow a specific pattern)
 //! 1. Add it to `FollowerItemSettings::from_idex`, giving it its own index
-//!    (MQTT `NERO/Control/Mode` selects followers by this index)
+//!    (Zenoh `NERO/Control/Mode` selects followers by this index)
 //! 2. To expose it as a `--color-mode` CLI/env default (not just reachable
-//!    over MQTT), add a variant to `DefaultWheelMode` and match it in
+//!    over Zenoh), add a variant to `DefaultWheelMode` and match it in
 //!    `DefaultWheelMode::into_wheel_mode`, pointing at the index from step 1
 //!
 //! Adding a new bipolar follower (single signed topic; solid color + LED
 //! count driven by sign/magnitude instead of a continuous gradient, e.g.
 //! motor current: green while discharging, blue while regenerating)
 //! 1. Add it to `BipolarFollowerItemSettings::from_idex`, giving it its own
-//!    index (MQTT `NERO/Control/Mode` mode 3 selects it by this index)
+//!    index (Zenoh `NERO/Control/Mode` mode 3 selects it by this index)
 //! 2. To expose it as a `--color-mode` CLI/env default, add a variant to
 //!    `DefaultWheelMode` and match it in `DefaultWheelMode::into_wheel_mode`
 
@@ -219,7 +219,7 @@ enum WheelMode {
 }
 
 impl WheelMode {
-    /// Convert from the MQTT settings to a valid Wheel Mode
+    /// Convert from the Zenoh settings to a valid Wheel Mode
     /// If an invalid setting is passed in wheel mode is reset to Demo1
     fn from_settings(value: u8, extra_data: &[f32]) -> Self {
         match value {
@@ -257,7 +257,7 @@ impl WheelMode {
 }
 
 /// The default wheel mode to boot the color controller into, before any
-/// `NERO/Control/Mode` command has been received over MQTT.
+/// `NERO/Control/Mode` command has been received over Zenoh.
 #[derive(clap::ValueEnum, Clone, Copy, Debug, Default)]
 pub enum DefaultWheelMode {
     /// A hue sweep of HSV on a loop
@@ -507,7 +507,7 @@ fn calculate_settings(mode: &mut WheelMode, last_settings: &Settings) -> Option<
     }
 }
 
-/// Handle recieving a MQTT message, which could either do nothing or
+/// Handle recieving a Zenoh message, which could either do nothing or
 /// mutate the brightness or mode.
 ///
 /// Returns whether existing settings should be reset
@@ -571,7 +571,7 @@ fn handle_recv_msg(msg: PlaybackData, brightness: &mut u8, mode: &mut WheelMode)
 
 pub async fn color_controller(
     cancel_token: CancellationToken,
-    mut mqtt_recv_rx: broadcast::Receiver<PlaybackData>,
+    mut zenoh_recv_rx: broadcast::Receiver<PlaybackData>,
     default_mode: DefaultWheelMode,
 ) {
     // cache the paths for quick reuse here, because building a Path is zero cost but also I am afraid
@@ -626,7 +626,7 @@ pub async fn color_controller(
                     }
                 }
             },
-            Ok(msg) = mqtt_recv_rx.recv() => {
+            Ok(msg) = zenoh_recv_rx.recv() => {
                 if handle_recv_msg(msg, &mut current_brightness, &mut current_mode) {
                     last_settings = [
                         Hsv::new(0.0, 0.0, 0.0),

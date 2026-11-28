@@ -3,7 +3,7 @@
 //! Beta
 //!
 //! Requires:
-//!  - Sending MQTT messages
+//!  - Sending Zenoh messages
 //!  - A GPSd instance running at default port
 
 use std::{error::Error, time::UNIX_EPOCH};
@@ -23,7 +23,7 @@ use crate::PublishableMessage;
 /// changes settings and sends GPS data
 pub async fn gps_manager(
     cancel_token: CancellationToken,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // lets create some GPS
     let stream = TcpStream::connect("127.0.0.1:2947").await?;
@@ -45,7 +45,7 @@ pub async fn gps_manager(
                         match msg {
                             Ok(msg) => {
                                 if let Some(data) = handle_gps_msg(msg).await {
-                                    send_gps_data(data, &mqtt_sender_tx, time).await;
+                                    send_gps_data(data, &zenoh_sender_tx, time).await;
                                 }
 
                             },
@@ -77,7 +77,7 @@ async fn handle_gps_msg(msg: String) -> Option<UnifiedResponse> {
 
 async fn send_gps_data(
     data: UnifiedResponse,
-    mqtt_sender_tx: &Sender<PublishableMessage>,
+    zenoh_sender_tx: &Sender<PublishableMessage>,
     time: u64,
 ) {
     let msgs = match data {
@@ -148,7 +148,7 @@ async fn send_gps_data(
     };
 
     for msg in msgs {
-        if let Err(e) = mqtt_sender_tx.send(msg).await {
+        if let Err(e) = zenoh_sender_tx.send(msg).await {
             warn!("Error sending GPS message: {}", e);
         }
     }

@@ -18,7 +18,7 @@ use std::time::Duration;
 pub async fn monitor_daq(
     cancel_token: CancellationToken,
     device: String,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
     can_handler_tx: Sender<CanFrame>,
 ) {
     let mut timeout = interval(Duration::from_millis(200));
@@ -32,7 +32,7 @@ pub async fn monitor_daq(
         daq_cancel_token.clone(),
         device.clone(),
         daq_monitor_tx.clone(),
-        mqtt_sender_tx.clone(),
+        zenoh_sender_tx.clone(),
         can_handler_tx.clone(),
     ));
 
@@ -55,7 +55,7 @@ pub async fn monitor_daq(
                         },
                     }
                     daq_cancel_token = CancellationToken::new();
-                    task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), mqtt_sender_tx.clone(), can_handler_tx.clone()));
+                    task = tokio::task::spawn(collect_daq(daq_cancel_token.clone(), device.clone(), daq_monitor_tx.clone(), zenoh_sender_tx.clone(), can_handler_tx.clone()));
                     warn!("Respawing DAQ thread");
                 }
                 watchdog = false;

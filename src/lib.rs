@@ -1,6 +1,5 @@
 // HELPERS
 pub mod can_handler;
-pub mod mqtt_handler;
 pub mod uploader;
 pub mod zenoh_handler;
 
@@ -16,9 +15,7 @@ pub mod lockdown;
 pub mod logger;
 pub mod net;
 pub mod numerical;
-pub mod sys_parser;
 pub mod visual;
-pub mod zenoh_bridge;
 
 // PROTOBUF
 pub mod playback_data;

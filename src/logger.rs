@@ -5,7 +5,7 @@
 //! Beta, well tested
 //!
 //! Requires:
-//!  - All MQTT messages
+//!  - All Zenoh messages
 //!  - Getting HV topic signal
 //!
 
@@ -23,10 +23,10 @@ use tracing::{info, warn};
 use crate::{HVTransition, SAVE_LOCATION, playback_data};
 
 /// runs the mute/unmute functionality
-/// Takes in a receiver of all MQTT messages
+/// Takes in a receiver of all Zenoh messages
 pub async fn logger_manager(
     cancel_token: CancellationToken,
-    mut mqtt_recv_rx: tokio::sync::broadcast::Receiver<playback_data::PlaybackData>,
+    mut zenoh_recv_rx: tokio::sync::broadcast::Receiver<playback_data::PlaybackData>,
     mut hv_stat_recv: tokio::sync::watch::Receiver<HVTransition>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut writer: Option<BufWriter<File>> = None;
@@ -68,7 +68,7 @@ pub async fn logger_manager(
               }
 
             },
-            msg = mqtt_recv_rx.recv() => {
+            msg = zenoh_recv_rx.recv() => {
                 if writer.is_none() {
                     continue;
                 }

@@ -1,6 +1,6 @@
 //! Diagnostic data for the can interface.
 //! Requires:
-//!  - MQTT sending
+//!  - Zenoh sending
 //!  - `canbusload`
 
 use std::process::Stdio;
@@ -13,7 +13,7 @@ use tracing::{debug, trace, warn};
 
 pub async fn can_data_scraper(
     cancel_token: CancellationToken,
-    mqtt_sender_tx: Sender<PublishableMessage>,
+    zenoh_sender_tx: Sender<PublishableMessage>,
     base_name: String,
     can_iface: String,
 ) {
@@ -44,14 +44,14 @@ pub async fn can_data_scraper(
     loop {
         tokio::select! {
             _ = cancel_token.cancelled() => {
-                debug!("Shutting down MQTT processor!");
+                debug!("Shutting down CAN stats scraper!");
                 break;
             },
             Ok(Some(line)) = stream.next_line() => {
                 trace!("Got data from canbusload: {line}");
                 if !line.is_empty() {
                     let sends = get_stats( line, &frames_topic, &bits_topic, &util_topic).await;
-                    handle_sends(sends, &mqtt_sender_tx).await;
+                    handle_sends(sends, &zenoh_sender_tx).await;
                 }
             }
         }
@@ -104,11 +104,11 @@ async fn get_stats(
 
 async fn handle_sends(
     send_list: Vec<PublishableMessage>,
-    mqtt_sender_tx: &Sender<PublishableMessage>,
+    zenoh_sender_tx: &Sender<PublishableMessage>,
 ) {
     for item in send_list.into_iter() {
-        if let Err(err) = mqtt_sender_tx.send(item).await {
-            warn!("Error putting message in MQTT queue for net: {} ", err);
+        if let Err(err) = zenoh_sender_tx.send(item).await {
+            warn!("Error putting message in Zenoh queue: {} ", err);
         }
     }
 }
